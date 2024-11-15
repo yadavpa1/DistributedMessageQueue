@@ -13,8 +13,8 @@ message Message {
     string topic = 3;        // Topic name
     // int32 partition = 4;     // Partition ID
     // int64 offset = 5;        // Offset within the partition
-    int64 timestamp = 6;     // Message creation timestamp
-    optional int64 size = 7; // Size of the message;
+    int64 timestamp = 4;     // Message creation timestamp
+    optional int64 size = 5; // Size of the message;
 }
 
 message ProduceMessageRequest {
