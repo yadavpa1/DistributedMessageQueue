@@ -1,14 +1,13 @@
 #ifndef MESSAGE_QUEUE_PRODUCER_H
 #define MESSAGE_QUEUE_PRODUCER_H
 
-#include <iostream>
 #include <string>
 #include <memory>
 
-class MessageQueueProducer {
+class Producer {
 public:
     // Constructor that initializes the gRPC channel and stub using the server IP
-    MessageQueueProducer(const std::string& server_ip);
+    Producer(const std::string& server_ip);
 
     // Produces a message to the message queue
     bool ProduceMessage(const std::string& key, const std::string& value, const std::string& topic,
