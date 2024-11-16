@@ -1,15 +1,18 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.10)
 
-project(MessageQueue C CXX)
+project(DistributedMessageQueue CXX)
 
-# Include common CMake settings
 include("${CMAKE_CURRENT_SOURCE_DIR}/common.cmake")
 
-# abseil-cpp (Google's common libraries) is required
+# Find absl package
 find_package(absl CONFIG REQUIRED)
 
+# Find RocksDB
+find_package(RocksDB CONFIG REQUIRED)
+message(STATUS "RocksDB found at: ${ROCKSDB_LIB}")
+
 # Proto file
-get_filename_component(dmq_proto "proto/message_queue.proto" ABSOLUTE)
+get_filename_component(dmq_proto "./proto/message_queue.proto" ABSOLUTE)
 get_filename_component(dmq_proto_path "${dmq_proto}" PATH)
 
 # Generated sources
@@ -30,10 +33,11 @@ add_custom_command(
 
 # Include generated *.pb.h files
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/message_queue_server")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/producer")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/consumer")
 
-# dmq_grpc_proto
+# dmq_grpc_proto library
 add_library(dmq_grpc_proto
     "${dmq_proto_srcs}"
     "${dmq_grpc_srcs}"
@@ -47,14 +51,29 @@ target_link_libraries(dmq_grpc_proto
     ${_PROTOBUF_LIBPROTOBUF}
     -static-libstdc++ -static-libgcc)
 
-# Set compiler flags for position-independent code for building shared libraries
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+# RocksDB wrapper library
+add_library(rocksdb_wrapper
+  message_queue_server/rocksdb_wrapper.cc)
+target_link_libraries(rocksdb_wrapper
+  RocksDB::rocksdb 
+  -static-libstdc++ -static-libgcc)
 
-# Create shared library for the consumer
+# Message queue server
+add_executable(message_queue_server
+  message_queue_server/message_queue_service.cc)
+target_link_libraries(message_queue_server
+  rocksdb_wrapper
+  dmq_grpc_proto
+  absl::flags_parse
+  absl::log_initialize
+  absl::log_globals
+  ${CMAKE_THREAD_LIBS_INIT}
+  -static-libstdc++ -static-libgcc)
+
+# Consumer library
 add_library(consumer SHARED 
     consumer/consumer.cc
 )
-
 target_link_libraries(consumer
     dmq_grpc_proto
     absl::flags_parse
@@ -62,11 +81,10 @@ target_link_libraries(consumer
     absl::log_globals
     -static-libstdc++ -static-libgcc)
 
-# Create shared library for the producer
+# Producer library
 add_library(producer SHARED 
 producer/producer.cc
 )
-
 target_link_libraries(producer
 dmq_grpc_proto
 absl::flags_parse
@@ -74,3 +92,5 @@ absl::log_initialize
 absl::log_globals
 -static-libstdc++ -static-libgcc)
 
+# Set compiler flags for position-independent code for building shared libraries
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
