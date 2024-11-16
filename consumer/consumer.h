@@ -19,7 +19,8 @@ private:
 
 public:
     Consumer(std::string server_address);
-    std::vector<MessageResponse> ConsumeMessage(int start_offset, int max_messages);
+    ~Consumer();
+    std::vector<MessageResponse> ConsumeMessage(std::string topic);
 };
 
 #endif // CONSUMER_H

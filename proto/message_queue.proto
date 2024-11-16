@@ -29,10 +29,10 @@ message ProduceMessageResponse {
 }
 
 message ConsumeMessageRequest {
-    // string topic = 1;         // Topic to consume from
+    string topic = 1;         // Topic to consume from
     // int32 partition = 2;      // Partition ID
-    int64 start_offset = 1;   // Offset to start consuming from
-    int32 max_messages = 2;   // Maximum number of messages to fetch
+    // int64 start_offset = 1;   // Offset to start consuming from
+    // int32 max_messages = 2;   // Maximum number of messages to fetch
 }
 
 message ConsumeMessageResponse {

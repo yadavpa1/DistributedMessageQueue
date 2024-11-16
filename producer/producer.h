@@ -9,6 +9,8 @@ public:
     // Constructor that initializes the gRPC channel and stub using the server IP
     Producer(const std::string& server_ip);
 
+    ~Producer(); // Declare the destructor
+
     // Produces a message to the message queue
     bool ProduceMessage(const std::string& key, const std::string& value, const std::string& topic,
                         const std::string& producer_id, const std::string& ack_mode);

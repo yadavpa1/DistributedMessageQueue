@@ -18,9 +18,11 @@ grpc::Status MessageQueueServiceImpl::ProduceMessage(
     try {
         db_wrapper_.put(key.str(), value.str());
         response->set_success(true);
+        std::cout << "Message produced successfully." << std::endl;
     } catch (const std::exception& e) {
         response->set_success(false);
         response->set_error_message(e.what());
+        std::cerr << "Failed to produce message: " << e.what() << std::endl;
     }
     return grpc::Status::OK;
 }
@@ -39,10 +41,17 @@ grpc::Status MessageQueueServiceImpl::ConsumeMessage(
             msg->set_value(value.substr(delimiter_pos + 1));
             msg->set_topic(request->topic());
         }
+
+        if (!it->status().ok()) {
+            throw std::runtime_error(it->status().ToString());
+        }
+
+        std::cout << "Messages consumed successfully." << std::endl;
         response->set_success(true);
     } catch (const std::exception& e) {
         response->set_success(false);
         response->set_error_message(e.what());
+        std::cerr << "Failed to consume messages: " << e.what() << std::endl;
     }
     return grpc::Status::OK;
 }

@@ -62,6 +62,8 @@ private:
 Producer::Producer(const std::string& server_address)
     : impl_(std::make_unique<Impl>(server_address)) {}
 
+Producer::~Producer() = default; // Defaulted destructor
+
 bool Producer::ProduceMessage(const std::string& key, const std::string& value,
                                           const std::string& topic, const std::string& producer_id,
                                           const std::string& ack_mode) {
