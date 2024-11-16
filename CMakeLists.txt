@@ -60,6 +60,7 @@ target_link_libraries(rocksdb_wrapper
 
 # Message queue server
 add_executable(message_queue_server
+  message_queue_server/main.cc
   message_queue_server/message_queue_service.cc)
 target_link_libraries(message_queue_server
   rocksdb_wrapper
@@ -81,16 +82,29 @@ target_link_libraries(consumer
     absl::log_globals
     -static-libstdc++ -static-libgcc)
 
+add_executable(consumer_client
+consumer/consumer_client.cc)
+target_link_libraries(consumer_client
+consumer)
+
 # Producer library
 add_library(producer SHARED 
-producer/producer.cc
+    producer/producer.cc
 )
 target_link_libraries(producer
-dmq_grpc_proto
-absl::flags_parse
-absl::log_initialize
-absl::log_globals
--static-libstdc++ -static-libgcc)
+    dmq_grpc_proto
+    absl::flags_parse
+    absl::log_initialize
+    absl::log_globals
+)
+
+# Producer client executable
+add_executable(producer_client
+    producer/producer_client.cc
+)
+target_link_libraries(producer_client
+    producer
+)
 
 # Set compiler flags for position-independent code for building shared libraries
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
