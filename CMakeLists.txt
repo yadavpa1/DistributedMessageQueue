@@ -30,6 +30,7 @@ add_custom_command(
 
 # Include generated *.pb.h files
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
+include_directories("${CMAKE_CURRENT_BINARY_DIR}/producer")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/consumer")
 
 # dmq_grpc_proto
@@ -60,4 +61,16 @@ target_link_libraries(consumer
     absl::log_initialize
     absl::log_globals
     -static-libstdc++ -static-libgcc)
+
+# Create shared library for the producer
+add_library(producer SHARED 
+producer/producer.cc
+)
+
+target_link_libraries(producer
+dmq_grpc_proto
+absl::flags_parse
+absl::log_initialize
+absl::log_globals
+-static-libstdc++ -static-libgcc)
 
