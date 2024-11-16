@@ -13,10 +13,9 @@ public:
         stub_ = message_queue::message_queue::NewStub(channel);
     }
 
-    std::vector<MessageResponse> ConsumeMessage(int start_offset, int max_messages) {
+    std::vector<MessageResponse> ConsumeMessage(std::string topic) {
         message_queue::ConsumeMessageRequest request;
-        request.set_start_offset(start_offset);
-        request.set_max_messages(max_messages);
+        request.set_topic(topic);
 
         message_queue::ConsumeMessageResponse response;
         grpc::ClientContext context;
@@ -27,6 +26,12 @@ public:
             std::cerr << "gRPC error: " << status.error_code() << ": " << status.error_message() << std::endl;
             return {};
         }
+
+        if (!response.success()) {
+            std::cerr << "ConsumeMessage failed: " << response.error_message() << std::endl;
+            return {};
+        }
+
         std::vector<MessageResponse> messages;
         for(const auto& message : response.messages()) {
             MessageResponse msg;
@@ -45,6 +50,8 @@ private:
 
 Consumer::Consumer(std::string server_address) : impl_(std::make_unique<Impl>(server_address)) {}
 
-std::vector<MessageResponse> Consumer::ConsumeMessage(int start_offset, int max_messages) {
-    return impl_->ConsumeMessage(start_offset, max_messages);
+Consumer::~Consumer() = default;
+
+std::vector<MessageResponse> Consumer::ConsumeMessage(std::string topic) {
+    return impl_->ConsumeMessage(topic);
 }
