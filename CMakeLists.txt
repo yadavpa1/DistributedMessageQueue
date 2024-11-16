@@ -56,8 +56,8 @@ add_library(consumer SHARED
 
 target_link_libraries(consumer
     dmq_grpc_proto
-    absl::flags_parse,
-    absl::log_initialize,
-    absl::log_globals,
+    absl::flags_parse
+    absl::log_initialize
+    absl::log_globals
     -static-libstdc++ -static-libgcc)
 
