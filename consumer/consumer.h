@@ -18,7 +18,7 @@ private:
     std::unique_ptr<Impl> impl_;
 
 public:
-    explicit Consumer(std::string server_address);
+    Consumer(std::string server_address);
     std::vector<MessageResponse> ConsumeMessage(int start_offset, int max_messages);
 };
 

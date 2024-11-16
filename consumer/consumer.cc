@@ -8,7 +8,7 @@
 
 class Consumer::Impl {
 public:
-    explicit Impl(std::string server_address) {
+    Impl(std::string server_address) {
         auto channel = grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials());
         stub_ = message_queue::message_queue::NewStub(channel);
     }
