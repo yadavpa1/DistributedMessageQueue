@@ -33,6 +33,7 @@ add_custom_command(
 
 # Include generated *.pb.h files
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/common")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/message_queue_server")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/producer")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/consumer")
@@ -97,6 +98,7 @@ target_link_libraries(consumer_group
     -static-libstdc++ -static-libgcc
 )
 
+# Consumer client executable
 add_executable(consumer_client
 consumer/consumer_client.cc)
 target_link_libraries(consumer_client
@@ -106,6 +108,7 @@ target_link_libraries(consumer_client
 # Producer library
 add_library(producer SHARED 
     producer/producer.cc
+    common/router.cc
 )
 target_link_libraries(producer
     dmq_grpc_proto

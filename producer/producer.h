@@ -2,12 +2,13 @@
 #define MESSAGE_QUEUE_PRODUCER_H
 
 #include <string>
+#include <vector>
 #include <memory>
 
 class Producer {
 public:
-    // Constructor that initializes the gRPC channel and stub using the server IP
-    Producer(const std::string& server_ip);
+    // Constructor to initialize producer with bootstrap servers
+    Producer(const std::vector<std::string>& bootstrap_servers);
 
     ~Producer(); // Declare the destructor
 
