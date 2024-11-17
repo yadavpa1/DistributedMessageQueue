@@ -1,14 +1,18 @@
-#include "consumer.h"
+#include "consumer_group.h"
 #include <iostream>
 #include <string>
 #include <vector>
 
 void RunConsumerClient(const std::string& server_address) {
-    Consumer consumer(server_address);
-
     std::string topic;
     std::cout << "Enter Topic to Subscribe: ";
     std::getline(std::cin, topic);
+
+    ConsumerGroup consumer_group("test_group", "123");
+
+    consumer_group.AddConsumer(server_address, "consumer1", {"topic1"}, {0}, {0});
+
+    consumer_group.PrintConsumerGroup();
 
     std::cout << "Listening for messages on topic: " << topic << std::endl;
 
@@ -24,7 +28,7 @@ void RunConsumerClient(const std::string& server_address) {
         }
 
         // Fetch messages when the user presses Enter
-        std::vector<MessageResponse> messages = consumer.ConsumeMessage(topic);
+        std::vector<MessageResponse> messages = consumer_group.ConsumeMessage(topic, 0, 10);
 
         if (!messages.empty()) {
             for (const auto& message : messages) {

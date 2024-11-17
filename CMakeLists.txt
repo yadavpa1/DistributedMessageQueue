@@ -51,41 +51,57 @@ target_link_libraries(dmq_grpc_proto
     ${_PROTOBUF_LIBPROTOBUF}
     -static-libstdc++ -static-libgcc)
 
-# RocksDB wrapper library
-add_library(rocksdb_wrapper
-  message_queue_server/rocksdb_wrapper.cc)
-target_link_libraries(rocksdb_wrapper
-  RocksDB::rocksdb 
-  -static-libstdc++ -static-libgcc)
+# # RocksDB wrapper library
+# add_library(rocksdb_wrapper
+#   message_queue_server/rocksdb_wrapper.cc)
+# target_link_libraries(rocksdb_wrapper
+#   RocksDB::rocksdb 
+#   -static-libstdc++ -static-libgcc)
 
-# Message queue server
-add_executable(message_queue_server
-  message_queue_server/main.cc
-  message_queue_server/message_queue_service.cc)
-target_link_libraries(message_queue_server
-  rocksdb_wrapper
-  dmq_grpc_proto
-  absl::flags_parse
-  absl::log_initialize
-  absl::log_globals
-  ${CMAKE_THREAD_LIBS_INIT}
-  -static-libstdc++ -static-libgcc)
+# # Message queue server
+# add_executable(message_queue_server
+#   message_queue_server/main.cc
+#   message_queue_server/message_queue_service.cc)
+# target_link_libraries(message_queue_server
+#   rocksdb_wrapper
+#   dmq_grpc_proto
+#   absl::flags_parse
+#   absl::log_initialize
+#   absl::log_globals
+#   ${CMAKE_THREAD_LIBS_INIT}
+#   -static-libstdc++ -static-libgcc)
 
 # Consumer library
-add_library(consumer SHARED 
+add_library(consumer 
     consumer/consumer.cc
 )
+
 target_link_libraries(consumer
     dmq_grpc_proto
     absl::flags_parse
     absl::log_initialize
     absl::log_globals
-    -static-libstdc++ -static-libgcc)
+)
+
+# Consumer group library
+add_library(consumer_group SHARED 
+    consumer/consumer_group.cc
+)
+
+target_link_libraries(consumer_group
+    consumer
+    dmq_grpc_proto
+    absl::flags_parse
+    absl::log_initialize
+    absl::log_globals
+    -static-libstdc++ -static-libgcc
+)
 
 add_executable(consumer_client
 consumer/consumer_client.cc)
 target_link_libraries(consumer_client
-consumer)
+    consumer_group
+)
 
 # Producer library
 add_library(producer SHARED 

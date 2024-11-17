@@ -48,10 +48,14 @@ private:
     std::unique_ptr<message_queue::message_queue::Stub> stub_;
 };
 
-Consumer::Consumer(std::string server_address) : impl_(std::make_unique<Impl>(server_address)) {}
+Consumer::Consumer(std::string server_address, std::string consumer_id) : impl_(std::make_unique<Impl>(server_address)), consumer_id(consumer_id) {}
 
 Consumer::~Consumer() = default;
 
-std::vector<MessageResponse> Consumer::ConsumeMessage(std::string topic) {
+std::vector<MessageResponse> Consumer::ConsumeMessage(std::string topic, int partition, int offset, int max_messages) {
     return impl_->ConsumeMessage(topic);
+}
+
+std::string Consumer::get_consumer_id() {
+    return this->consumer_id;
 }

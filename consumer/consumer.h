@@ -16,11 +16,13 @@ class Consumer {
 private:
     class Impl;
     std::unique_ptr<Impl> impl_;
+    std::string consumer_id;
 
 public:
-    Consumer(std::string server_address);
+    Consumer(std::string server_address, std::string consumer_id);
     ~Consumer();
-    std::vector<MessageResponse> ConsumeMessage(std::string topic);
+    std::vector<MessageResponse> ConsumeMessage(std::string topic, int partition, int offset, int max_messages);
+    std::string get_consumer_id();
 };
 
 #endif // CONSUMER_H
