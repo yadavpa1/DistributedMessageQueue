@@ -1,9 +1,10 @@
 #include "producer.h"
 #include <iostream>
 #include <string>
+#include <vector>
 
-void RunProducerClient(const std::string& server_ip) {
-    Producer producer(server_ip);
+void RunProducerClient(const std::vector<std::string>& bootstrap_servers) {
+    Producer producer(bootstrap_servers);
 
     std::string key, value, topic, producer_id, ack_mode;
 
@@ -42,13 +43,17 @@ void RunProducerClient(const std::string& server_ip) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        std::cerr << "Usage: " << argv[0] << " <server_ip>" << std::endl;
+    if (argc < 2) {
+        std::cerr << "Usage: " << argv[0] << " <bootstrap_server1> [<bootstrap_server2> ...]" << std::endl;
         return 1;
     }
 
-    const std::string server_ip = argv[1];
-    RunProducerClient(server_ip);
+    std::vector<std::string> bootstrap_servers;
+    for (int i = 1; i < argc; ++i) {
+        bootstrap_servers.push_back(argv[i]);
+    }
+
+    RunProducerClient(bootstrap_servers);
 
     return 0;
 }
