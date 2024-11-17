@@ -10,7 +10,7 @@ void RunConsumerClient(const std::string& server_address) {
 
     ConsumerGroup consumer_group("test_group", "123");
 
-    consumer_group.AddConsumer(server_address, "consumer1", {"topic1"}, {0}, {0});
+    consumer_group.AddConsumer(server_address, "consumer1", {topic}, {0}, {0});
 
     consumer_group.PrintConsumerGroup();
 
