@@ -24,3 +24,33 @@ public:
 };
 
 #endif // CONSUMER_H
+
+
+/* New Consumer code:
+
+#ifndef CONSUMER_H
+#define CONSUMER_H
+
+#include <string>
+#include "message_queue.grpc.pb.h"
+#include <grpcpp/grpcpp.h>
+
+class Consumer {
+private:
+    std::string groupId;
+    std::string consumerId;
+    std::shared_ptr<message_queue::message_queue::Stub> brokerStub;
+
+public:
+    Consumer(const std::string& brokerAddress, const std::string& groupId, const std::string& consumerId);
+
+    // Consume messages from a topic partition
+    void consumeMessages(const std::string& topic, int partition, int maxMessages);
+
+    // Commit the last consumed offset
+    void commitOffset(const std::string& topic, int partition, int64_t offset);
+};
+
+#endif // CONSUMER_H
+
+*/

@@ -55,3 +55,77 @@ Consumer::~Consumer() = default;
 std::vector<MessageResponse> Consumer::ConsumeMessage(std::string topic) {
     return impl_->ConsumeMessage(topic);
 }
+
+/*
+
+New consumer code that implements consumer groups:
+
+#include "consumer.h"
+#include <iostream>
+
+Consumer::Consumer(const std::string& brokerAddress, const std::string& groupId, const std::string& consumerId)
+    : groupId(groupId), consumerId(consumerId) {
+    brokerStub = message_queue::message_queue::NewStub(grpc::CreateChannel(
+        brokerAddress, grpc::InsecureChannelCredentials()));
+}
+
+void Consumer::consumeMessages(const std::string& topic, int partition, int maxMessages) {
+    grpc::ClientContext context;
+    message_queue::ConsumeMessageRequest request;
+    message_queue::ConsumeMessageResponse response;
+
+    request.set_group_id(groupId);
+    request.set_topic(topic);
+    request.set_partition(partition);
+    request.set_max_messages(maxMessages);
+
+    auto status = brokerStub->ConsumeMessage(&context, request, &response);
+
+    if (!status.ok()) {
+        std::cerr << "Failed to consume messages: " << status.error_message() << std::endl;
+        return;
+    }
+
+    if (!response.success()) {
+        std::cerr << "ConsumeMessage error: " << response.error_message() << std::endl;
+        return;
+    }
+
+    std::cout << "Consumed messages from topic: " << topic << ", partition: " << partition << std::endl;
+    for (const auto& message : response.messages()) {
+        std::cout << "Message Key: " << message.key() << ", Value: " << message.value() << std::endl;
+        // Example: Process the message here
+    }
+
+    // Commit the last consumed offset
+    if (!response.messages().empty()) {
+        int64_t lastOffset = response.messages().rbegin()->offset();
+        commitOffset(topic, partition, lastOffset);
+    }
+}
+
+void Consumer::commitOffset(const std::string& topic, int partition, int64_t offset) {
+    grpc::ClientContext context;
+    message_queue::CommitOffsetRequest request;
+    message_queue::CommitOffsetResponse response;
+
+    request.set_group_id(groupId);
+    request.set_topic(topic);
+    request.set_partition(partition);
+    request.set_offset(offset);
+
+    auto status = brokerStub->CommitOffset(&context, request, &response);
+
+    if (!status.ok()) {
+        std::cerr << "Failed to commit offset: " << status.error_message() << std::endl;
+        return;
+    }
+
+    if (!response.success()) {
+        std::cerr << "CommitOffset error: " << response.error_message() << std::endl;
+        return;
+    }
+
+    std::cout << "Offset committed: " << offset << " for topic: " << topic << ", partition: " << partition << std::endl;
+}
+*/
