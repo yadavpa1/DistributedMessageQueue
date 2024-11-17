@@ -1,5 +1,6 @@
 #include "router.h"
 #include <iostream>
+#include <thread>
 
 Router::Router(const std::vector<std::string>& bootstrap_servers) {
     // Iterate over bootstrap servers to find a reachable one
@@ -24,7 +25,17 @@ std::string Router::GetLeader(const std::string& topic, int partition) {
     if (routing_table_.count(topic) && routing_table_[topic].count(partition)) {
         return routing_table_[topic][partition];
     }
-    throw std::runtime_error("Leader not found for topic: " + topic + ", partition: " + std::to_string(partition));
+
+    // If partition leader is not found for a paritcular topic then fetch metadata for that topic
+    std::cerr << "Leader not found for topic: " << topic << ", partition: " << partition
+              << ". Refreshing metadata..." << std::endl;
+
+    FetchMetadata(topic);
+    if (routing_table_.count(topic) && routing_table_[topic].count(partition)) {
+        return routing_table_[topic][partition];
+    }
+
+    throw std::runtime_error("Failed to find leader after metadata refresh");
 }
 
 int Router::GetTotalPartitions(const std::string& topic) {
@@ -35,6 +46,9 @@ int Router::GetTotalPartitions(const std::string& topic) {
     throw std::runtime_error("Partition count not available for topic: " + topic);
 }
 
+// Fetch metadata for a given topic only if it is not already cached
+// If using cached metadat then need to ensure that cache is updated periodically
+// Another option is to always fetch metadata from the server insted of checking if cache exists.
 void Router::UpdateMetadata(const std::string& topic) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (routing_table_.count(topic) == 0) {
@@ -57,7 +71,7 @@ void Router::FetchMetadata(const std::string& topic) {
     if (status.ok() && response.success()) {
         std::cout << "Metadata fetched successfully for topic: " << topic << std::endl;
         routing_table_[topic].clear();
-        topic_partitions_[topic] = response.partitions_size()
+        topic_partitions_[topic] = response.partitions_size();
         for (const auto& partition : response.partitions()) {
             routing_table_[topic][partition.partition_id()] = partition.leader_address();
         }
