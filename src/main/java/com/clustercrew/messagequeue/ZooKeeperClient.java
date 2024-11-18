@@ -62,6 +62,38 @@ public class ZooKeeperClient {
     }
 
     /**
+     * Stores the ledger mapping for a topic partition in ZooKeeper.
+     *
+     * @param topic     The topic name.
+     * @param partition The partition number.
+     * @param ledgerId  The ID of the ledger to map.
+     * @throws Exception If an error occurs while storing the mapping.
+     */
+    public void storeLedgerMapping(String topic, int partition, long ledgerId) throws Exception {
+        String path = "/topics/" + topic + "/partitions/" + partition + "/ledger";
+        ensurePathExists(path);
+        zk.setData(path, String.valueOf(ledgerId).getBytes(StandardCharsets.UTF_8), -1);
+    }
+
+    /**
+     * Retrieves the ledger ID for a topic partition from ZooKeeper.
+     *
+     * @param topic     The topic name.
+     * @param partition The partition number.
+     * @return The ledger ID.
+     * @throws Exception If an error occurs while retrieving the mapping.
+     */
+    public long getLedgerId(String topic, int partition) throws Exception {
+        String path = "/topics/" + topic + "/partitions/" + partition + "/ledger";
+        Stat stat = zk.exists(path, false);
+        if (stat == null) {
+            throw new Exception("Ledger mapping not found for topic: " + topic + ", partition: " + partition);
+        }
+        byte[] data = zk.getData(path, false, null);
+        return Long.parseLong(new String(data, StandardCharsets.UTF_8));
+    }
+
+    /**
      * Assigns a consumer group to a partition.
      *
      * @param groupId   The consumer group ID.

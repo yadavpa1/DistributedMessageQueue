@@ -18,7 +18,7 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
     public MessageQueueServer(String zkServers, String bkServers) {
         try {
             this.zkClient = new ZooKeeperClient(zkServers);
-            this.bkClient = new BookKeeperClient(bkServers);
+            this.bkClient = new BookKeeperClient(bkServers, zkClient);
         } catch (Exception e) {
             throw new RuntimeException("Failed to initialize MessageQueueServer", e);
         }
