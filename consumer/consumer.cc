@@ -10,12 +10,16 @@ class Consumer::Impl {
 public:
     Impl(std::string server_address) {
         auto channel = grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials());
-        stub_ = message_queue::message_queue::NewStub(channel);
+        stub_ = message_queue::MessageQueue::NewStub(channel);
     }
 
-    std::vector<MessageResponse> ConsumeMessage(std::string topic) {
+    std::vector<MessageResponse> ConsumeMessage(std::string group_id, std::string topic, int partition, int offset, int max_messages) {
         message_queue::ConsumeMessageRequest request;
+        request.set_group_id(group_id);
         request.set_topic(topic);
+        request.set_partition(partition);
+        request.set_start_offset(offset);
+        request.set_max_messages(max_messages);
 
         message_queue::ConsumeMessageResponse response;
         grpc::ClientContext context;
@@ -45,15 +49,15 @@ public:
     }
 
 private:
-    std::unique_ptr<message_queue::message_queue::Stub> stub_;
+    std::unique_ptr<message_queue::MessageQueue::Stub> stub_;
 };
 
 Consumer::Consumer(std::string server_address, std::string consumer_id) : impl_(std::make_unique<Impl>(server_address)), consumer_id(consumer_id) {}
 
 Consumer::~Consumer() = default;
 
-std::vector<MessageResponse> Consumer::ConsumeMessage(std::string topic, int partition, int offset, int max_messages) {
-    return impl_->ConsumeMessage(topic);
+std::vector<MessageResponse> Consumer::ConsumeMessage(std::string group_id, std::string topic, int partition, int offset, int max_messages) {
+    return impl_->ConsumeMessage(group_id, topic, partition, offset, max_messages);
 }
 
 std::string Consumer::get_consumer_id() {

@@ -104,7 +104,7 @@ std::vector <MessageResponse> ConsumerGroup::ConsumeMessage(std::string topic, i
         }
     }
 
-    messages = consumer->ConsumeMessage(topic, partition, offset, max_messages);
+    messages = consumer->ConsumeMessage(this->group_id, topic, partition, offset, max_messages);
 
     for(auto& state : consumer_topic_state_[consumer_id][topic]) {
         if(state.partition == partition) {

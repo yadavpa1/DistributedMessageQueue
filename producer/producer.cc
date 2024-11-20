@@ -8,7 +8,7 @@ class Producer::Impl {
 public:
     Impl(const std::string& server_address) {
         auto channel_ = grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials());
-        stub_ = message_queue::message_queue::NewStub(channel_);
+        stub_ = message_queue::MessageQueue::NewStub(channel_);
         if (!stub_) {
             std::cerr << "Failed to create stub for server at " << server_address << std::endl;
             throw std::runtime_error("Stub initialization failed");
@@ -55,7 +55,7 @@ public:
     }
 
 private:
-    std::unique_ptr<message_queue::message_queue::Stub> stub_;
+    std::unique_ptr<message_queue::MessageQueue::Stub> stub_;
 };
 
 // Producer constructor

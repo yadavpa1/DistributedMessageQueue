@@ -12,7 +12,7 @@ find_package(RocksDB CONFIG REQUIRED)
 message(STATUS "RocksDB found at: ${ROCKSDB_LIB}")
 
 # Proto file
-get_filename_component(dmq_proto "./proto/message_queue.proto" ABSOLUTE)
+get_filename_component(dmq_proto "./src/main/proto/message_queue.proto" ABSOLUTE)
 get_filename_component(dmq_proto_path "${dmq_proto}" PATH)
 
 # Generated sources
