@@ -7,6 +7,7 @@ import com.clustercrew.messagequeue.MessageQueueOuterClass.*;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
@@ -14,16 +15,46 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
     private final ZooKeeperClient zkClient;
     private final BookKeeperClient bkClient;
     private final Map<String, Map<Integer, Partition>> topicPartitions;
+    private final String brokerId;
+    private final PartitionAssigner partitionAssigner;
 
-    public MessageQueueServer(String zkServers, String bkServers) {
+    public MessageQueueServer(String zkServers, String bkServers, String brokerId) {
+        this.brokerId = brokerId;
         try {
             this.zkClient = new ZooKeeperClient(zkServers);
             this.bkClient = new BookKeeperClient(bkServers, zkClient);
+            this.partitionAssigner = new PartitionAssigner(zkClient);
         } catch (Exception e) {
             throw new RuntimeException("Failed to initialize MessageQueueServer", e);
         }
         this.topicPartitions = new HashMap<>();
-    }    
+
+        try {
+            registerBroker();
+            initializeAssignedPartitions();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to register broker or initialize partitions", e);
+        }
+    }
+    
+    /**
+     * Registers the broker in ZooKeeper.
+     */
+    private void registerBroker() throws Exception {
+        zkClient.registerBroker(brokerId);
+        System.out.println("Broker registered with ID: " + brokerId);
+    }
+
+    /**
+     * Initializes partitions assigned to this broker.
+     */
+    private void initializeAssignedPartitions() throws Exception {
+        List<Integer> assignedPartitions = zkClient.getAssignedPartitions(brokerId);
+        for (Integer partitionId : assignedPartitions) {
+            getOrCreatePartition("my-topic", partitionId); // Assume "my-topic" for simplicity
+        }
+        System.out.println("Initialized partitions for broker: " + assignedPartitions);
+    }
 
     @Override
     public void produceMessage(ProduceMessageRequest request, StreamObserver<ProduceMessageResponse> responseObserver) {
@@ -32,6 +63,12 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
         int partition = message.getPartition();
 
         try {
+            // Validate if this broker is responsible for the partition
+            String assignedBroker = zkClient.getPartitionBroker(topic, partition);
+            if (!assignedBroker.equals(brokerId)) {
+                throw new IllegalArgumentException("Partition " + partition + " is not assigned to this broker.");
+            }
+            
             Partition partitionInstance = getOrCreatePartition(topic, partition);
             partitionInstance.appendMessage(message);
 
@@ -59,6 +96,12 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
         int maxMessages = request.getMaxMessages();
 
         try {
+            // Validate if this broker is responsible for the partition
+            String assignedBroker = zkClient.getPartitionBroker(topic, partition);
+            if (!assignedBroker.equals(brokerId)) {
+                throw new IllegalArgumentException("Partition " + partition + " is not assigned to this broker.");
+            }
+
             Partition partitionInstance = getPartition(topic, partition);
             if (partitionInstance == null) {
                 throw new IllegalArgumentException("Partition not found");
@@ -136,9 +179,10 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
     public static void main(String[] args) throws IOException, InterruptedException {
         String zkServers = "localhost:2181";
         String bkServers = "localhost:3181";
+        String brokerId = "broker-1";
 
         Server server = ServerBuilder.forPort(8080)
-                .addService(new MessageQueueServer(zkServers, bkServers))
+                .addService(new MessageQueueServer(zkServers, bkServers, brokerId))
                 .build()
                 .start();
 

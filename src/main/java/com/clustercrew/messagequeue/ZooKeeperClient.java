@@ -4,7 +4,8 @@ import org.apache.zookeeper.*;
 import org.apache.zookeeper.data.Stat;
 
 import java.nio.charset.StandardCharsets;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class ZooKeeperClient {
     private final ZooKeeper zk;
@@ -38,6 +39,101 @@ public class ZooKeeperClient {
     }
 
     /**
+     * Registers a broker in ZooKeeper.
+     *
+     * @param brokerId The ID of the broker.
+     * @throws Exception If an error occurs while registering the broker.
+     */
+    public void registerBroker(String brokerId) throws Exception {
+        String path = "/brokers/" + brokerId;
+        ensurePathExists(path);
+        System.out.println("Broker registered: " + brokerId);
+    }
+
+    /**
+     * Retrieves a list of active brokers from ZooKeeper.
+     *
+     * @return A list of broker IDs.
+     * @throws Exception If an error occurs while fetching the broker list.
+     */
+    public List<String> getActiveBrokers() throws Exception {
+        String path = "/brokers";
+        ensurePathExists(path);
+        return zk.getChildren(path, false);
+    }
+
+    /**
+     * Retrieves the list of partitions assigned to a broker.
+     *
+     * @param brokerId The ID of the broker.
+     * @return List of partition IDs assigned to the broker.
+     * @throws Exception If an error occurs while fetching the partitions.
+     */
+    public List<Integer> getAssignedPartitions(String brokerId) throws Exception {
+        String brokerPath = "/brokers/" + brokerId + "/partitions";
+        ensurePathExists(brokerPath);
+
+        List<Integer> assignedPartitions = new ArrayList<>();
+        List<String> partitionNodes = zk.getChildren(brokerPath, false);
+
+        for (String partitionNode : partitionNodes) {
+            assignedPartitions.add(Integer.parseInt(partitionNode));
+        }
+
+        return assignedPartitions;
+    }
+
+    /**
+     * Assigns a partition to a broker.
+     *
+     * @param topic     The topic name.
+     * @param partition The partition number.
+     * @param brokerId  The broker ID.
+     * @throws Exception If an error occurs while assigning the partition.
+     */
+    public void assignPartitionToBroker(String topic, int partition, String brokerId) throws Exception {
+        String brokerPartitionPath = "/brokers/" + brokerId + "/partitions/" + partition;
+        String topicPartitionPath = "/topics/" + topic + "/partitions/" + partition + "/broker";
+
+        ensurePathExists(brokerPartitionPath);
+        ensurePathExists(topicPartitionPath);
+
+        zk.setData(brokerPartitionPath, String.valueOf(partition).getBytes(StandardCharsets.UTF_8), -1);
+        zk.setData(topicPartitionPath, brokerId.getBytes(StandardCharsets.UTF_8), -1);
+    }
+
+    /**
+     * Retrieves the broker responsible for a partition.
+     *
+     * @param topic     The topic name.
+     * @param partition The partition number.
+     * @return The broker ID.
+     * @throws Exception If an error occurs while fetching the broker.
+     */
+    public String getPartitionBroker(String topic, int partition) throws Exception {
+        String path = "/topics/" + topic + "/partitions/" + partition + "/broker";
+        Stat stat = zk.exists(path, false);
+        if (stat == null) {
+            throw new Exception("No broker assigned for topic: " + topic + ", partition: " + partition);
+        }
+        byte[] data = zk.getData(path, false, null);
+        return new String(data, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Retrieves the list of partitions for a topic.
+     *
+     * @param topic The topic name.
+     * @return A list of partition IDs.
+     * @throws Exception If an error occurs while fetching partitions.
+     */
+    public List<String> getPartitions(String topic) throws Exception {
+        String topicPath = "/topics/" + topic + "/partitions";
+        ensurePathExists(topicPath);
+        return zk.getChildren(topicPath, false);
+    }
+
+    /**
      * Creates a new topic in ZooKeeper with the specified metadata.
      *
      * @param topic            The name of the topic.
@@ -56,7 +152,7 @@ public class ZooKeeperClient {
 
         // Create partitions
         for (int i = 0; i < numPartitions; i++) {
-            ensurePathExists(topicPath + "/" + i);
+            ensurePathExists(topicPath + "/partitions/" + i);
         }
         System.out.println("Topic created: " + topic);
     }
@@ -140,18 +236,6 @@ public class ZooKeeperClient {
         }
         byte[] data = zk.getData(path, false, null);
         return Long.parseLong(new String(data, StandardCharsets.UTF_8));
-    }
-
-    /**
-     * Gets the list of partitions for a topic.
-     *
-     * @param topic The topic name.
-     * @return A list of partition IDs.
-     * @throws Exception If an error occurs while fetching partitions.
-     */
-    public List<String> getPartitions(String topic) throws Exception {
-        String topicPath = "/topics/" + topic;
-        return zk.getChildren(topicPath, false);
     }
 
     /**
