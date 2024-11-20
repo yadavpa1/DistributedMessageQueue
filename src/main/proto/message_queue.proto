@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+option java_package = "com.clustercrew.messagequeue";
+
+package message_queue;
+
+service MessageQueue {
+    rpc ProduceMessage(ProduceMessageRequest) returns (ProduceMessageResponse);
+    rpc ConsumeMessage(ConsumeMessageRequest) returns (ConsumeMessageResponse);
+    rpc CommitOffset(CommitOffsetRequest) returns (CommitOffsetResponse);
+}
+
+message Message {
+    string key = 1;          // Message key for partitioning
+    string value = 2;        // Message payload
+    string topic = 3;        // Topic name
+    int32 partition = 4;     // Partition ID
+    int64 offset = 5;        // Offset within the partition
+    int64 timestamp = 6;     // Message creation timestamp
+    optional int64 size = 7; // Size of the message
+}
+
+message ProduceMessageRequest {
+    Message message = 1;     // Message details
+    string producer_id = 2;  // ID of the producer
+    string ack_mode = 3;     // Acknowledgment mode (e.g., "all", "1", "0")
+}
+
+message ProduceMessageResponse {
+    bool success = 1;         // Whether the operation was successful
+    string error_message = 2; // Error message if applicable
+}
+
+message ConsumeMessageRequest {
+    string group_id = 1;      // Consumer group ID
+    string topic = 2;         // Topic to consume from
+    int32 partition = 3;      // Partition ID
+    int64 start_offset = 4;   // Offset to start consuming from
+    int32 max_messages = 5;   // Maximum number of messages to fetch
+}
+
+message ConsumeMessageResponse {
+    repeated Message messages = 1;  // List of messages
+    bool success = 2;               // Whether the operation was successful
+    string error_message = 3;       // Error message if applicable
+}
+
+message CommitOffsetRequest {
+    string group_id = 1;         // Consumer group ID
+    string topic = 2;            // Topic name
+    int32 partition = 3;         // Partition ID
+    int64 offset = 4;            // Offset to commit
+}
+
+message CommitOffsetResponse {
+    bool success = 1;            // Whether the operation was successful
+    string error_message = 2;    // Error message if applicable
+}

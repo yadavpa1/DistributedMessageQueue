@@ -1,2 +1,5 @@
 .vscode
 cmake
+build
+.gradle
+bin
