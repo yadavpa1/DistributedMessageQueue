@@ -12,7 +12,7 @@ find_package(RocksDB CONFIG REQUIRED)
 message(STATUS "RocksDB found at: ${ROCKSDB_LIB}")
 
 # Proto file
-get_filename_component(dmq_proto "./proto/message_queue.proto" ABSOLUTE)
+get_filename_component(dmq_proto "./src/main/proto/message_queue.proto" ABSOLUTE)
 get_filename_component(dmq_proto_path "${dmq_proto}" PATH)
 
 # Generated sources
@@ -72,20 +72,36 @@ target_link_libraries(message_queue_server
   -static-libstdc++ -static-libgcc)
 
 # Consumer library
-add_library(consumer SHARED 
+add_library(consumer 
     consumer/consumer.cc
 )
+
 target_link_libraries(consumer
     dmq_grpc_proto
     absl::flags_parse
     absl::log_initialize
     absl::log_globals
-    -static-libstdc++ -static-libgcc)
+)
+
+# Consumer group library
+add_library(consumer_group SHARED 
+    consumer/consumer_group.cc
+)
+
+target_link_libraries(consumer_group
+    consumer
+    dmq_grpc_proto
+    absl::flags_parse
+    absl::log_initialize
+    absl::log_globals
+    -static-libstdc++ -static-libgcc
+)
 
 add_executable(consumer_client
 consumer/consumer_client.cc)
 target_link_libraries(consumer_client
-consumer)
+    consumer_group
+)
 
 # Producer library
 add_library(producer SHARED 

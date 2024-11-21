@@ -7,7 +7,6 @@ package message_queue;
 service MessageQueue {
     rpc ProduceMessage(ProduceMessageRequest) returns (ProduceMessageResponse);
     rpc ConsumeMessage(ConsumeMessageRequest) returns (ConsumeMessageResponse);
-    rpc CommitOffset(CommitOffsetRequest) returns (CommitOffsetResponse);
 }
 
 message Message {
@@ -43,16 +42,4 @@ message ConsumeMessageResponse {
     repeated Message messages = 1;  // List of messages
     bool success = 2;               // Whether the operation was successful
     string error_message = 3;       // Error message if applicable
-}
-
-message CommitOffsetRequest {
-    string group_id = 1;         // Consumer group ID
-    string topic = 2;            // Topic name
-    int32 partition = 3;         // Partition ID
-    int64 offset = 4;            // Offset to commit
-}
-
-message CommitOffsetResponse {
-    bool success = 1;            // Whether the operation was successful
-    string error_message = 2;    // Error message if applicable
 }
