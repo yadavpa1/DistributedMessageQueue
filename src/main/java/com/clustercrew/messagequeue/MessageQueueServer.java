@@ -102,6 +102,17 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
                 throw new IllegalArgumentException("Partition " + partition + " is not assigned to this broker.");
             }
 
+            // Handle offset commit request (max_messages = 0)
+            if (maxMessages == 0) {
+                zkClient.updateConsumerOffset(groupId, topic, partition, startOffset);
+                ConsumeMessageResponse response = ConsumeMessageResponse.newBuilder()
+                        .setSuccess(true)
+                        .build();
+                responseObserver.onNext(response);
+                return;
+            }
+
+            // Fetch messages normally for max_messages > 0
             Partition partitionInstance = getPartition(topic, partition);
             if (partitionInstance == null) {
                 throw new IllegalArgumentException("Partition not found");
@@ -119,31 +130,6 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
             responseObserver.onNext(responseBuilder.build());
         } catch (Exception e) {
             ConsumeMessageResponse response = ConsumeMessageResponse.newBuilder()
-                    .setSuccess(false)
-                    .setErrorMessage(e.getMessage())
-                    .build();
-            responseObserver.onNext(response);
-        } finally {
-            responseObserver.onCompleted();
-        }
-    }
-
-    @Override
-    public void commitOffset(CommitOffsetRequest request, StreamObserver<CommitOffsetResponse> responseObserver) {
-        String groupId = request.getGroupId();
-        String topic = request.getTopic();
-        int partition = request.getPartition();
-        long offset = request.getOffset();
-
-        try {
-            zkClient.updateConsumerOffset(groupId, topic, partition, offset);
-
-            CommitOffsetResponse response = CommitOffsetResponse.newBuilder()
-                    .setSuccess(true)
-                    .build();
-            responseObserver.onNext(response);
-        } catch (Exception e) {
-            CommitOffsetResponse response = CommitOffsetResponse.newBuilder()
                     .setSuccess(false)
                     .setErrorMessage(e.getMessage())
                     .build();
