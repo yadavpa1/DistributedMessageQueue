@@ -11,7 +11,7 @@ public class PartitionAssigner {
     }
 
     /**
-     * Assigns partitions of a topic to the given list of brokers.
+     * Assigns partitions of a topic to the given list of brokers.git 
      * This uses a round-robin strategy to distribute partitions evenly.
      *
      * @param topic         The topic name.
