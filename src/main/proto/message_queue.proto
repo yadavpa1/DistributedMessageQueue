@@ -6,7 +6,8 @@ package message_queue;
 
 service MessageQueue {
     rpc ProduceMessage(ProduceMessageRequest) returns (ProduceMessageResponse);
-    rpc ConsumeMessage(ConsumeMessageRequest) returns (ConsumeMessageResponse);
+    rpc ConsumeMessage(ConsumeMessageRequest) returns (ConsumeMessageResponse);    
+    rpc GetMetadata(MetadataRequest) returns (MetadataResponse);
 }
 
 message Message {
@@ -42,4 +43,20 @@ message ConsumeMessageResponse {
     repeated Message messages = 1;  // List of messages
     bool success = 2;               // Whether the operation was successful
     string error_message = 3;       // Error message if applicable
+}
+
+message MetadataRequest {
+    string topic = 1; // Name of the topic to fetch metadata for
+}
+
+message PartitionMetadata {
+    int32 partition_id = 1;        // Partition ID
+    string leader_address = 2;    // Address of the leader for this partition
+}
+
+message MetadataResponse {
+    string topic = 1;                         // Topic name
+    repeated PartitionMetadata partitions = 2; // Metadata for each partition
+    bool success = 3;                         // Whether the operation was successful
+    string error_message = 4;                 // Error message if applicable
 }
