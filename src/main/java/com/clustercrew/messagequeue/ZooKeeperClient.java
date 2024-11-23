@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 
 public class ZooKeeperClient {
     private final ZooKeeper zk;
+    private final PartitionAssigner partitionAssigner;
 
     public ZooKeeperClient(String zkServers) throws Exception {
         this.zk = new ZooKeeper(zkServers, 3000, event -> {
@@ -16,26 +17,35 @@ public class ZooKeeperClient {
                 System.out.println("Connected to ZooKeeper");
             }
         });
+        this.partitionAssigner = new PartitionAssigner(this);
     }
 
     /**
-     * Ensures the given path exists in ZooKeeper.
+     * Creates a new topic in ZooKeeper with the specified metadata.
      *
-     * @param path The path to ensure.
-     * @throws Exception If an error occurs while creating the path.
+     * @param topic            The name of the topic.
+     * @param numPartitions    The number of partitions.
+     * @param retentionMs      The retention period in milliseconds.
+     * @param replicationFactor The replication factor.
+     * @throws Exception If an error occurs while creating the topic.
      */
-    private void ensurePathExists(String path) throws Exception {
-        if (zk.exists(path, false) == null) {
-            String[] parts = path.split("/");
-            StringBuilder currentPath = new StringBuilder();
-            for (String part : parts) {
-                if (part.isEmpty()) continue;
-                currentPath.append("/").append(part);
-                if (zk.exists(currentPath.toString(), false) == null) {
-                    zk.create(currentPath.toString(), new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-                }
-            }
+    public void createTopic(String topic, int numPartitions, int retentionMs, int replicationFactor) throws Exception {
+        String topicPath = "/topics/" + topic;
+        ensurePathExists(topicPath);
+
+        // Save metadata
+        String metadata = String.format("partitions=%d,retention=%d,replicas=%d", numPartitions, retentionMs, replicationFactor);
+        zk.setData(topicPath, metadata.getBytes(StandardCharsets.UTF_8), -1);
+
+        // Create partitions
+        for (int i = 0; i < numPartitions; i++) {
+            ensurePathExists(topicPath + "/partitions/" + i);
         }
+        System.out.println("Topic created: " + topic);
+
+        // Assign partitions to available brokers
+        List<String> activeBrokers = getActiveBrokers();
+        partitionAssigner.assignPartitions(topic, numPartitions, activeBrokers);
     }
 
     /**
@@ -48,6 +58,20 @@ public class ZooKeeperClient {
         String path = "/brokers/" + brokerId;
         ensurePathExists(path);
         System.out.println("Broker registered: " + brokerId);
+
+        // Assign unallocated partitions
+        List<String> topics = getTopics();
+
+        for (String topic : topics) {
+            List<String> partitions = getPartitions(topic);
+
+            for (String partitionId : partitions) {
+                if (getPartitionBroker(topic, Integer.parseInt(partitionId)) == null) {
+                    partitionAssigner.assignPartitions(topic, partitions.size(), getActiveBrokers());
+                    break;
+                }
+            }
+        }
     }
 
     /**
@@ -131,30 +155,6 @@ public class ZooKeeperClient {
         String topicPath = "/topics/" + topic + "/partitions";
         ensurePathExists(topicPath);
         return zk.getChildren(topicPath, false);
-    }
-
-    /**
-     * Creates a new topic in ZooKeeper with the specified metadata.
-     *
-     * @param topic            The name of the topic.
-     * @param numPartitions    The number of partitions.
-     * @param retentionMs      The retention period in milliseconds.
-     * @param replicationFactor The replication factor.
-     * @throws Exception If an error occurs while creating the topic.
-     */
-    public void createTopic(String topic, int numPartitions, int retentionMs, int replicationFactor) throws Exception {
-        String topicPath = "/topics/" + topic;
-        ensurePathExists(topicPath);
-
-        // Save metadata
-        String metadata = String.format("partitions=%d,retention=%d,replicas=%d", numPartitions, retentionMs, replicationFactor);
-        zk.setData(topicPath, metadata.getBytes(StandardCharsets.UTF_8), -1);
-
-        // Create partitions
-        for (int i = 0; i < numPartitions; i++) {
-            ensurePathExists(topicPath + "/partitions/" + i);
-        }
-        System.out.println("Topic created: " + topic);
     }
 
     /**
@@ -245,5 +245,62 @@ public class ZooKeeperClient {
      */
     public void close() throws InterruptedException {
         zk.close();
+    }
+
+    /**
+     * Ensures the given path exists in ZooKeeper.
+     *
+     * @param path The path to ensure.
+     * @throws Exception If an error occurs while creating the path.
+     */
+    private void ensurePathExists(String path) throws Exception {
+        if (zk.exists(path, false) == null) {
+            String[] parts = path.split("/");
+            StringBuilder currentPath = new StringBuilder();
+            for (String part : parts) {
+                if (part.isEmpty()) continue;
+                currentPath.append("/").append(part);
+                if (zk.exists(currentPath.toString(), false) == null) {
+                    zk.create(currentPath.toString(), new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                }
+            }
+        }
+    }
+
+    /**
+     * Retrieves the list of all topics stored in ZooKeeper.
+     *
+     * @return A list of topic names.
+     * @throws Exception If an error occurs while fetching the topics.
+     */
+    public List<String> getTopics() throws Exception {
+        String topicsPath = "/topics";
+        ensurePathExists(topicsPath);
+        return zk.getChildren(topicsPath, false);
+    }
+
+    /**
+     * Checks if a topic exists in ZooKeeper.
+     *
+     * @param topic The topic name.
+     * @return True if the topic exists, false otherwise.
+     * @throws Exception If an error occurs during the check.
+     */
+    public boolean topicExists(String topic) throws Exception {
+        String topicPath = "/topics/" + topic;
+        return zk.exists(topicPath, false) != null;
+    }
+
+    /**
+     * Checks if a partition exists for a topic in ZooKeeper.
+     *
+     * @param topic     The topic name.
+     * @param partition The partition number.
+     * @return True if the partition exists, false otherwise.
+     * @throws Exception If an error occurs during the check.
+     */
+    public boolean partitionExists(String topic, int partition) throws Exception {
+        String partitionPath = "/topics/" + topic + "/partitions/" + partition;
+        return zk.exists(partitionPath, false) != null;
     }
 }
