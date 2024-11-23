@@ -51,12 +51,12 @@ int Router::GetTotalPartitions(const std::string& topic) {
 // Another option is to always fetch metadata from the server insted of checking if cache exists.
 void Router::UpdateMetadata(const std::string& topic) {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (routing_table_.count(topic) == 0) {
-        std::cout << "Fetching metadata for topic: " << topic << std::endl;
-        FetchMetadata(topic);
-    } else {
-        std::cout << "Metadata for topic: " << topic << " is already cached. Reading from cache" << std::endl;
-    }
+    // if (routing_table_.count(topic) == 0) {
+    std::cout << "Fetching metadata for topic: " << topic << std::endl;
+    FetchMetadata(topic);
+    // } else {
+    //     std::cout << "Metadata for topic: " << topic << " is already cached. Reading from cache" << std::endl;
+    // }
 }
 
 void Router::FetchMetadata(const std::string& topic) {
