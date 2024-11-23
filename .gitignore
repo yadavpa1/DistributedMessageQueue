@@ -3,3 +3,6 @@ cmake
 build
 .gradle
 bin
+zookeeper_data
+bookkeeper_data
+docker-compose.yml

@@ -1,4 +1,5 @@
 #include "consumer.h"
+#include "router.h"
 
 #include "message_queue.grpc.pb.h"
 #include <grpcpp/grpcpp.h>
@@ -8,12 +9,24 @@
 
 class Consumer::Impl {
 public:
-    Impl(std::string server_address) {
-        auto channel = grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials());
-        stub_ = message_queue::MessageQueue::NewStub(channel);
+    Impl(const std::vector<std::string>& bootstrap_servers) {
+        router_ = std::make_unique<Router>(bootstrap_servers);
     }
 
     std::vector<MessageResponse> ConsumeMessage(std::string group_id, std::string topic, int partition, int offset, int max_messages) {
+        // Ensure metadata for the topic is available
+        router_->UpdateMetadata(topic);
+
+        // Get leader for partition
+        std::string leader = router_->GetLeader(topic, partition);
+
+        std::cout << "Routing message to leader: " << leader << " for topic: " << topic
+                  << ", partition: " << partition << std::endl;
+        
+        // Create gRPC stub for the leader
+        auto channel = grpc::CreateChannel(leader, grpc::InsecureChannelCredentials());
+        auto stub_ = message_queue::MessageQueue::NewStub(channel);
+
         message_queue::ConsumeMessageRequest request;
         request.set_group_id(group_id);
         request.set_topic(topic);
@@ -49,10 +62,10 @@ public:
     }
 
 private:
-    std::unique_ptr<message_queue::MessageQueue::Stub> stub_;
+    std::unique_ptr<Router> router_;
 };
 
-Consumer::Consumer(std::string server_address, std::string consumer_id) : impl_(std::make_unique<Impl>(server_address)), consumer_id(consumer_id) {}
+Consumer::Consumer(const std::vector<std::string>& bootstrap_servers, std::string consumer_id) : impl_(std::make_unique<Impl>(bootstrap_servers)), consumer_id(consumer_id) {}
 
 Consumer::~Consumer() = default;
 

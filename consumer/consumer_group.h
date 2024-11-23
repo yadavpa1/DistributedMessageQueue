@@ -27,7 +27,7 @@ private:
 public:
     ConsumerGroup(std::string tag, std::string group_id);
     ~ConsumerGroup();
-    bool AddConsumer(std::string server_address, std::string consumer_id, std::vector<std::string> topics, std::vector<int> partitions, std::vector<int> offsets);
+    bool AddConsumer(const std::vector<std::string>& bootstrap_servers, std::string consumer_id, std::vector<std::string> topics, std::vector<int> partitions, std::vector<int> offsets);
     bool RemoveConsumer(std::string consumer_id);
     std::vector<MessageResponse> ConsumeMessage(std::string topic, int partition, int max_messages);
     void PrintConsumerGroup();
