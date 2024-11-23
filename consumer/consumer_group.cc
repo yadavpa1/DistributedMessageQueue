@@ -13,7 +13,7 @@ bool ConsumerGroup::IsTopicConsumed(std::string topic, int partition) {
     return false;
 }
 
-bool ConsumerGroup::AddConsumer(std::string server_address, std::string consumer_id, std::vector<std::string> topics, std::vector<int> partitions, std::vector<int> offsets) {
+bool ConsumerGroup::AddConsumer(const std::vector<std::string>& bootstrap_servers, std::string consumer_id, std::vector<std::string> topics, std::vector<int> partitions, std::vector<int> offsets) {
     // Check if the consumer is already present in the group
     for(const auto& consumer : consumers_) {
         if(consumer->get_consumer_id() == consumer_id) {
@@ -31,7 +31,7 @@ bool ConsumerGroup::AddConsumer(std::string server_address, std::string consumer
         }
     }
 
-    consumers_.push_back(std::make_unique<Consumer>(server_address, consumer_id));
+    consumers_.push_back(std::make_unique<Consumer>(bootstrap_servers, consumer_id));
 
     for(int i = 0; i < topics.size(); i++) {
         for(int j = 0; j < partitions.size(); j++) {

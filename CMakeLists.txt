@@ -75,6 +75,7 @@ target_link_libraries(dmq_grpc_proto
 # Consumer library
 add_library(consumer 
     consumer/consumer.cc
+    common/router.cc
 )
 
 target_link_libraries(consumer

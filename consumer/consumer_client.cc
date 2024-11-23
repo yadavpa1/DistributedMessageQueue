@@ -3,14 +3,14 @@
 #include <string>
 #include <vector>
 
-void RunConsumerClient(const std::string& server_address) {
+void RunConsumerClient(const std::vector<std::string>& bootstrap_servers) {
     std::string topic;
     std::cout << "Enter Topic to Subscribe: ";
     std::getline(std::cin, topic);
 
     ConsumerGroup consumer_group("test_group", "123");
 
-    consumer_group.AddConsumer(server_address, "consumer1", {topic}, {0}, {0});
+    consumer_group.AddConsumer(bootstrap_servers, "consumer1", {topic}, {0}, {0});
 
     consumer_group.PrintConsumerGroup();
 
@@ -44,13 +44,17 @@ void RunConsumerClient(const std::string& server_address) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        std::cerr << "Usage: " << argv[0] << " <server_address>" << std::endl;
+    if (argc < 2) {
+        std::cerr << "Usage: " << argv[0] << " <bootstrap_server1> [<bootstrap_server2> ...]" << std::endl;
         return 1;
     }
 
-    const std::string server_address = argv[1];
-    RunConsumerClient(server_address);
+    std::vector<std::string> bootstrap_servers;
+    for (int i = 1; i < argc; ++i) {
+        bootstrap_servers.push_back(argv[i]);
+    }
+
+    RunConsumerClient(bootstrap_servers);
 
     return 0;
 }
