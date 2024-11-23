@@ -63,6 +63,23 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
         int partition = message.getPartition();
 
         try {
+            // Check if the topic exists in ZooKeeper
+            if (!zkClient.topicExists(topic)) {
+                // Initialize topic metadata (e.g., partitions, retention, replicas)
+                int numPartitions = 3;
+                int retentionMs = 30 * 60 * 1000; // 30 mins retention
+                int replicationFactor = 3;
+
+                // Create the topic in ZooKeeper
+                zkClient.createTopic(topic, numPartitions, retentionMs, replicationFactor);
+                System.out.println("Topic created dynamically: " + topic);
+            }
+
+            // Validate if the partition exists
+            if (!zkClient.partitionExists(topic, partition)) {
+                throw new IllegalArgumentException("Partition " + partition + " does not exist for topic " + topic);
+            }
+
             // Validate if this broker is responsible for the partition
             String assignedBroker = zkClient.getPartitionBroker(topic, partition);
             if (!assignedBroker.equals(brokerId)) {

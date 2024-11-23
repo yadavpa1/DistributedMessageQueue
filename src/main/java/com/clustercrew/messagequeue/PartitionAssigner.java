@@ -21,16 +21,25 @@ public class PartitionAssigner {
      */
     public void assignPartitions(String topic, int numPartitions, List<String> brokerIds) throws Exception {
         if (brokerIds.isEmpty()) {
-            throw new Exception("No active brokers available for partition assignment");
+            System.out.println("No active brokers available for partition assignment");
+            return;
         }
 
         System.out.println("Assigning " + numPartitions + " partitions for topic: " + topic);
 
-        for (int i = 0; i < numPartitions; i++) {
-            // Use round-robin to assign partitions
-            String brokerId = brokerIds.get(i % brokerIds.size());
+        // Determine how many brokers can be used
+        int brokersAvailable = Math.min(numPartitions, brokerIds.size());
+
+        for (int i = 0; i < brokersAvailable; i++) {
+            // Directly assign each partition to a unique broker
+            String brokerId = brokerIds.get(i);
             zkClient.assignPartitionToBroker(topic, i, brokerId);
             System.out.println("Partition " + i + " assigned to broker " + brokerId);
+        }
+
+        // Log unassigned partitions if brokers are insufficient
+        for (int i = brokersAvailable; i < numPartitions; i++) {
+            System.out.println("Partition " + i + " for topic " + topic + " remains unassigned due to insufficient brokers");
         }
     }
 
