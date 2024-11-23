@@ -7,7 +7,7 @@ Router::Router(const std::vector<std::string>& bootstrap_servers) {
     for (const auto& server : bootstrap_servers) {
         try {
             auto channel = grpc::CreateChannel(server, grpc::InsecureChannelCredentials());
-            stub_ = message_queue::message_queue::NewStub(channel);
+            stub_ = message_queue::MessageQueue::NewStub(channel);
             std::cout << "Connected to bootstrap server: " << server << std::endl;
             break;
         } catch (const std::exception& e) {

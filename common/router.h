@@ -28,7 +28,7 @@ private:
     std::unordered_map<std::string, std::unordered_map<int, std::string>> routing_table_;
     std::unordered_map<std::string, int> topic_partitions_;
     std::mutex mutex_;
-    std::unique_ptr<message_queue::message_queue::Stub> stub_;
+    std::unique_ptr<message_queue::MessageQueue::Stub> stub_;
 
     // Internal method to fetch metadata for a topic
     void FetchMetadata(const std::string& topic);

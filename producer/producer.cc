@@ -28,7 +28,7 @@ public:
 
             // Create gRPC stub for the leader
             auto channel = grpc::CreateChannel(leader, grpc::InsecureChannelCredentials());
-            auto stub = message_queue::message_queue::NewStub(channel);
+            auto stub = message_queue::MessageQueue::NewStub(channel);
 
             // Prepare the message
             message_queue::Message message;

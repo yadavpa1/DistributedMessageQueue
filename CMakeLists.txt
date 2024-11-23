@@ -34,7 +34,7 @@ add_custom_command(
 # Include generated *.pb.h files
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/common")
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/message_queue_server")
+# include_directories("${CMAKE_CURRENT_SOURCE_DIR}/message_queue_server")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/producer")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/consumer")
 
@@ -53,24 +53,24 @@ target_link_libraries(dmq_grpc_proto
     -static-libstdc++ -static-libgcc)
 
 # RocksDB wrapper library
-add_library(rocksdb_wrapper
-  message_queue_server/rocksdb_wrapper.cc)
-target_link_libraries(rocksdb_wrapper
-  RocksDB::rocksdb 
-  -static-libstdc++ -static-libgcc)
+# add_library(rocksdb_wrapper
+#   message_queue_server/rocksdb_wrapper.cc)
+# target_link_libraries(rocksdb_wrapper
+#   RocksDB::rocksdb 
+#   -static-libstdc++ -static-libgcc)
 
 # Message queue server
-add_executable(message_queue_server
-  message_queue_server/main.cc
-  message_queue_server/message_queue_service.cc)
-target_link_libraries(message_queue_server
-  rocksdb_wrapper
-  dmq_grpc_proto
-  absl::flags_parse
-  absl::log_initialize
-  absl::log_globals
-  ${CMAKE_THREAD_LIBS_INIT}
-  -static-libstdc++ -static-libgcc)
+# add_executable(message_queue_server
+#   message_queue_server/main.cc
+#   message_queue_server/message_queue_service.cc)
+# target_link_libraries(message_queue_server
+#   rocksdb_wrapper
+#   dmq_grpc_proto
+#   absl::flags_parse
+#   absl::log_initialize
+#   absl::log_globals
+#   ${CMAKE_THREAD_LIBS_INIT}
+#   -static-libstdc++ -static-libgcc)
 
 # Consumer library
 add_library(consumer 
