@@ -116,7 +116,7 @@ public class ZooKeeperClient {
      * @throws Exception If an error occurs while assigning the partition.
      */
     public void assignPartitionToBroker(String topic, int partition, String brokerId) throws Exception {
-        String brokerPartitionPath = "/brokers/" + brokerId + "/partitions/" + topic + "/" + partition;
+        String brokerPartitionPath = "/brokers/" + brokerId + "/topics/" + topic + "/partitions/" + partition;
         String topicPartitionPath = "/topics/" + topic + "/partitions/" + partition + "/broker";
 
         ensurePathExists(brokerPartitionPath);
@@ -126,6 +126,8 @@ public class ZooKeeperClient {
         zk.setData(brokerPartitionPath, String.valueOf(partition).getBytes(StandardCharsets.UTF_8), -1);
         // Store the broker ID under the topic partition path
         zk.setData(topicPartitionPath, brokerId.getBytes(StandardCharsets.UTF_8), -1);
+
+        System.out.println("Partition " + partition + " of topic " + topic + " assigned to broker " + brokerId);
     }
 
     /**
