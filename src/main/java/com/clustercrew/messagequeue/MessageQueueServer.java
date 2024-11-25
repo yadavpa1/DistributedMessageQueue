@@ -10,6 +10,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang3.tuple.Pair;
+
 public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
 
     private final ZooKeeperClient zkClient;
@@ -119,27 +121,31 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
                 throw new IllegalArgumentException("Partition " + partition + " is not assigned to this broker.");
             }
 
-            // Handle offset commit request (max_messages = 0)
+            // Check if max_messages is 0 (set offset mode)
             if (maxMessages == 0) {
                 zkClient.updateConsumerOffset(groupId, topic, partition, startOffset);
                 ConsumeMessageResponse response = ConsumeMessageResponse.newBuilder()
                         .setSuccess(true)
                         .build();
                 responseObserver.onNext(response);
-                return;
+                return; // Skip normal message fetching
             }
 
-            // Fetch messages normally for max_messages > 0
             Partition partitionInstance = getPartition(topic, partition);
             if (partitionInstance == null) {
-                throw new IllegalArgumentException("Partition not found");
+                throw new IllegalArgumentException(
+                        "Partition not found for topic " + topic + " and partition " + partition);
             }
 
-            var messages = partitionInstance.fetchMessages(startOffset, maxMessages);
+            List<Message> messages = partitionInstance.fetchMessages(startOffset, maxMessages);
+
+            // Update consumer offset for the group
+            long newOffset = startOffset + messages.size();
+            zkClient.updateConsumerOffset(groupId, topic, partition, newOffset);
 
             ConsumeMessageResponse.Builder responseBuilder = ConsumeMessageResponse.newBuilder()
                     .setSuccess(true);
-
+            
             for (Message msg : messages) {
                 responseBuilder.addMessages(msg);
             }
