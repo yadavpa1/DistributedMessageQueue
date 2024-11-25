@@ -25,14 +25,14 @@ public class BookKeeperClient {
     // Lock map to synchronize ledger creation for a topic partition
     private final ConcurrentHashMap<String, ConcurrentHashMap<Integer, ReentrantLock>> ledgerLocks;
 
-    public BookKeeperClient(String bkServers, ZooKeeperClient zkClient) throws Exception {
+    public BookKeeperClient(String servers, ZooKeeperClient zkClient) throws Exception {
         ClientConfiguration config = new ClientConfiguration();
-        config.setMetadataServiceUri("zk+null://" + bkServers + "/ledgers");
+        config.setMetadataServiceUri("zk+null://" + servers + "/ledgers");
         this.bookKeeper = BookKeeper.forConfig(config).build();
         this.zkClient = zkClient;
         this.activeLedgers = new ConcurrentHashMap<>();
         this.ledgerLocks = new ConcurrentHashMap<>();
-        System.out.println("Connected to BookKeeper: " + bkServers);
+        System.out.println("Connected to BookKeeper!");
     }
 
     /**

@@ -24,7 +24,7 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
         this.brokerId = brokerId;
         try {
             this.zkClient = new ZooKeeperClient(zkServers);
-            this.bkClient = new BookKeeperClient(bkServers, zkClient);
+            this.bkClient = new BookKeeperClient(zkServers, zkClient);
             this.partitionAssigner = new PartitionAssigner(zkClient);
         } catch (Exception e) {
             throw new RuntimeException("Failed to initialize MessageQueueServer", e);
@@ -187,7 +187,7 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
 
     public static void main(String[] args) throws IOException, InterruptedException {
         String zkServers = "localhost:2181";
-        String bkServers = "localhost:3181";
+        String bkServers = "";
         String brokerId = "broker-1";
 
         Server server = ServerBuilder.forPort(8080)
