@@ -5,7 +5,6 @@ import org.apache.zookeeper.data.Stat;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class ZooKeeperClient {
     private final ZooKeeper zk;
@@ -20,6 +19,27 @@ public class ZooKeeperClient {
         this.partitionAssigner = new PartitionAssigner(this);
     }
 
+    /**
+     * Ensures the given path exists in ZooKeeper.
+     *
+     * @param path The path to ensure.
+     * @throws Exception If an error occurs while creating the path.
+     */
+    private void ensurePathExists(String path) throws Exception {
+        if (zk.exists(path, false) == null) {
+            String[] parts = path.split("/");
+            StringBuilder currentPath = new StringBuilder();
+            for (String part : parts) {
+                if (part.isEmpty()) continue;
+                currentPath.append("/").append(part);
+                if (zk.exists(currentPath.toString(), false) == null) {
+                    zk.create(currentPath.toString(), new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                }
+            }
+        }
+    }
+
+    // ---------------------------------- Topic Management ----------------------------------
     /**
      * Creates a new topic in ZooKeeper with the specified metadata.
      *
@@ -47,6 +67,60 @@ public class ZooKeeperClient {
         List<String> activeBrokers = getActiveBrokers();
         partitionAssigner.assignPartitions(topic, numPartitions, activeBrokers);
     }
+
+    /**
+     * Retrieves the list of all topics stored in ZooKeeper.
+     *
+     * @return A list of topic names.
+     * @throws Exception If an error occurs while fetching the topics.
+     */
+    public List<String> getTopics() throws Exception {
+        String topicsPath = "/topics";
+        ensurePathExists(topicsPath);
+        return zk.getChildren(topicsPath, false);
+    }
+
+    /**
+     * Checks if a topic exists in ZooKeeper.
+     *
+     * @param topic The topic name.
+     * @return True if the topic exists, false otherwise.
+     * @throws Exception If an error occurs during the check.
+     */
+    public boolean topicExists(String topic) throws Exception {
+        String topicPath = "/topics/" + topic;
+        return zk.exists(topicPath, false) != null;
+    }
+
+    // ---------------------------------- Partition Management ----------------------------------
+
+    /**
+     * Retrieves the list of partitions for a topic.
+     *
+     * @param topic The topic name.
+     * @return A list of partition IDs.
+     * @throws Exception If an error occurs while fetching partitions.
+     */
+    public List<String> getPartitions(String topic) throws Exception {
+        String topicPath = "/topics/" + topic + "/partitions";
+        ensurePathExists(topicPath);
+        return zk.getChildren(topicPath, false);
+    }
+
+    /**
+     * Checks if a partition exists for a topic in ZooKeeper.
+     *
+     * @param topic     The topic name.
+     * @param partition The partition number.
+     * @return True if the partition exists, false otherwise.
+     * @throws Exception If an error occurs during the check.
+     */
+    public boolean partitionExists(String topic, int partition) throws Exception {
+        String partitionPath = "/topics/" + topic + "/partitions/" + partition;
+        return zk.exists(partitionPath, false) != null;
+    }
+
+    // ---------------------------------- Broker Management ----------------------------------
 
     /**
      * Registers a broker in ZooKeeper.
@@ -84,27 +158,6 @@ public class ZooKeeperClient {
         String path = "/brokers";
         ensurePathExists(path);
         return zk.getChildren(path, false);
-    }
-
-    /**
-     * Retrieves the list of partitions assigned to a broker.
-     *
-     * @param brokerId The ID of the broker.
-     * @return List of partition IDs assigned to the broker.
-     * @throws Exception If an error occurs while fetching the partitions.
-     */
-    public List<Integer> getAssignedPartitions(String brokerId) throws Exception {
-        String brokerPath = "/brokers/" + brokerId + "/partitions";
-        ensurePathExists(brokerPath);
-
-        List<Integer> assignedPartitions = new ArrayList<>();
-        List<String> partitionNodes = zk.getChildren(brokerPath, false);
-
-        for (String partitionNode : partitionNodes) {
-            assignedPartitions.add(Integer.parseInt(partitionNode));
-        }
-
-        return assignedPartitions;
     }
 
     /**
@@ -149,65 +202,109 @@ public class ZooKeeperClient {
     }
 
     /**
-     * Retrieves the list of partitions for a topic.
+     * Retrieves the list of partitions assigned to a broker.
      *
-     * @param topic The topic name.
-     * @return A list of partition IDs.
-     * @throws Exception If an error occurs while fetching partitions.
+     * @param brokerId The ID of the broker.
+     * @return List of partition IDs assigned to the broker.
+     * @throws Exception If an error occurs while fetching the partitions.
      */
-    public List<String> getPartitions(String topic) throws Exception {
-        String topicPath = "/topics/" + topic + "/partitions";
-        ensurePathExists(topicPath);
-        return zk.getChildren(topicPath, false);
-    }
+    public List<Integer> getAssignedPartitions(String brokerId) throws Exception {
+        String brokerPath = "/brokers/" + brokerId + "/partitions";
+        ensurePathExists(brokerPath);
 
-    /**
-     * Stores the ledger mapping for a topic partition in ZooKeeper.
-     *
-     * @param topic     The topic name.
-     * @param partition The partition number.
-     * @param ledgerId  The ID of the ledger to map.
-     * @throws Exception If an error occurs while storing the mapping.
-     */
-    public void storeLedgerMapping(String topic, int partition, long ledgerId) throws Exception {
-        String path = "/topics/" + topic + "/partitions/" + partition + "/ledger";
-        ensurePathExists(path);
-        zk.setData(path, String.valueOf(ledgerId).getBytes(StandardCharsets.UTF_8), -1);
-    }
+        List<Integer> assignedPartitions = new ArrayList<>();
+        List<String> partitionNodes = zk.getChildren(brokerPath, false);
 
-    /**
-     * Retrieves the ledger ID for a topic partition from ZooKeeper.
-     *
-     * @param topic     The topic name.
-     * @param partition The partition number.
-     * @return The ledger ID.
-     * @throws Exception If an error occurs while retrieving the mapping.
-     */
-    public long getLedgerId(String topic, int partition) throws Exception {
-        String path = "/topics/" + topic + "/partitions/" + partition + "/ledger";
-        Stat stat = zk.exists(path, false);
-        if (stat == null) {
-            throw new Exception("Ledger mapping not found for topic: " + topic + ", partition: " + partition);
+        for (String partitionNode : partitionNodes) {
+            assignedPartitions.add(Integer.parseInt(partitionNode));
         }
+
+        return assignedPartitions;
+    }
+
+    // ---------------------------------- Ledger Management ----------------------------------
+
+    /**
+     * Adds a new ledger ID to the list of ledgers for a topic partition.
+     *
+     * @param topic     The topic name.
+     * @param partition The partition number.
+     * @param ledgerId  The ledger ID to add.
+     * @throws Exception If an error occurs while updating the ledger list.
+     */
+    public void addLedgerToPartition(String topic, int partition, long ledgerId) throws Exception {
+        String path = "/topics/" + topic + "/partitions/" + partition + "/ledgers";
+        ensurePathExists(path);
+
+        // Fetch existing ledgers
         byte[] data = zk.getData(path, false, null);
-        return Long.parseLong(new String(data, StandardCharsets.UTF_8));
+        String currentLedgers = (data != null) ? new String(data, StandardCharsets.UTF_8) : "";
+        List<String> ledgerList = new ArrayList<>(Arrays.asList(currentLedgers.split(",")));
+
+        // Add new ledger and update ZooKeeper
+        ledgerList.add(String.valueOf(ledgerId));
+        zk.setData(path, String.join(",", ledgerList).getBytes(StandardCharsets.UTF_8), -1);
     }
 
     /**
-     * Assigns a consumer group to a partition.
+     * Retrieves the list of ledger IDs for a topic partition.
      *
-     * @param groupId   The consumer group ID.
      * @param topic     The topic name.
      * @param partition The partition number.
-     * @param consumerId The consumer ID.
-     * @throws Exception If an error occurs while assigning the consumer.
+     * @return A list of ledger IDs.
+     * @throws Exception If an error occurs while fetching the ledgers.
      */
-    public void assignPartitionToConsumer(String groupId, String topic, int partition, String consumerId) throws Exception {
-        String path = "/consumers/" + groupId + "/" + topic + "/" + partition + "/consumer";
+    public List<Long> getPartitionLedgers(String topic, int partition) throws Exception {
+        String path = "/topics/" + topic + "/partitions/" + partition + "/ledgers";
         ensurePathExists(path);
-        zk.setData(path, consumerId.getBytes(StandardCharsets.UTF_8), -1);
+
+        byte[] data = zk.getData(path, false, null);
+        if (data == null || data.length == 0) {
+            return new ArrayList<>();
+        }
+
+        String ledgers = new String(data, StandardCharsets.UTF_8);
+        List<Long> ledgerIds = new ArrayList<>();
+        for (String ledgerId : ledgers.split(",")) {
+            if (!ledgerId.isEmpty()) {
+                ledgerIds.add(Long.parseLong(ledgerId));
+            }
+        }
+        return ledgerIds;
     }
 
+    // ---------------------------------- Logical Offset Management ---------------------------------- //
+    /**
+     * Gets the current logical offset for a topic partition.
+     *
+     * @param topic     The topic name.
+     * @param partition The partition number.
+     * @return The current logical offset.
+     * @throws Exception If an error occurs while retrieving the offset.
+     */
+    public long getPartitionLogicalOffset(String topic, int partition) throws Exception {
+        String path = "/topics/" + topic + "/partitions/" + partition + "/logical_offset";
+        ensurePathExists(path);
+
+        byte[] data = zk.getData(path, false, null);
+        return (data == null || data.length == 0) ? 0 : Long.parseLong(new String(data, StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Updates the logical offset for a topic partition.
+     *
+     * @param topic     The topic name.
+     * @param partition The partition number.
+     * @param offset    The new logical offset.
+     * @throws Exception If an error occurs while updating the offset.
+     */
+    public void setPartitionLogicalOffset(String topic, int partition, long offset) throws Exception {
+        String path = "/topics/" + topic + "/partitions/" + partition + "/logical_offset";
+        ensurePathExists(path);
+        zk.setData(path, String.valueOf(offset).getBytes(StandardCharsets.UTF_8), -1);
+    }
+
+    // ---------------------------------- Consumer Offset Management ----------------------------------
     /**
      * Updates the last consumed offset for a consumer group.
      *
@@ -236,11 +333,13 @@ public class ZooKeeperClient {
         String path = "/consumers/" + groupId + "/" + topic + "/" + partition + "/offset";
         Stat stat = zk.exists(path, false);
         if (stat == null) {
-            return 0; // Default offset
+            return 0; // Default offset for a new consumer
         }
         byte[] data = zk.getData(path, false, null);
         return Long.parseLong(new String(data, StandardCharsets.UTF_8));
     }
+
+    // ----------------------- Utility ----------------------- //
 
     /**
      * Closes the ZooKeeper connection.
@@ -249,62 +348,5 @@ public class ZooKeeperClient {
      */
     public void close() throws InterruptedException {
         zk.close();
-    }
-
-    /**
-     * Ensures the given path exists in ZooKeeper.
-     *
-     * @param path The path to ensure.
-     * @throws Exception If an error occurs while creating the path.
-     */
-    private void ensurePathExists(String path) throws Exception {
-        if (zk.exists(path, false) == null) {
-            String[] parts = path.split("/");
-            StringBuilder currentPath = new StringBuilder();
-            for (String part : parts) {
-                if (part.isEmpty()) continue;
-                currentPath.append("/").append(part);
-                if (zk.exists(currentPath.toString(), false) == null) {
-                    zk.create(currentPath.toString(), new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-                }
-            }
-        }
-    }
-
-    /**
-     * Retrieves the list of all topics stored in ZooKeeper.
-     *
-     * @return A list of topic names.
-     * @throws Exception If an error occurs while fetching the topics.
-     */
-    public List<String> getTopics() throws Exception {
-        String topicsPath = "/topics";
-        ensurePathExists(topicsPath);
-        return zk.getChildren(topicsPath, false);
-    }
-
-    /**
-     * Checks if a topic exists in ZooKeeper.
-     *
-     * @param topic The topic name.
-     * @return True if the topic exists, false otherwise.
-     * @throws Exception If an error occurs during the check.
-     */
-    public boolean topicExists(String topic) throws Exception {
-        String topicPath = "/topics/" + topic;
-        return zk.exists(topicPath, false) != null;
-    }
-
-    /**
-     * Checks if a partition exists for a topic in ZooKeeper.
-     *
-     * @param topic     The topic name.
-     * @param partition The partition number.
-     * @return True if the partition exists, false otherwise.
-     * @throws Exception If an error occurs during the check.
-     */
-    public boolean partitionExists(String topic, int partition) throws Exception {
-        String partitionPath = "/topics/" + topic + "/partitions/" + partition;
-        return zk.exists(partitionPath, false) != null;
     }
 }
