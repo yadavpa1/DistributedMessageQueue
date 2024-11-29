@@ -1,7 +1,6 @@
 package com.clustercrew.messagequeue;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class PartitionAssigner {
     private final ZooKeeperClient zkClient;
