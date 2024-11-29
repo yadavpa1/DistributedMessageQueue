@@ -3,7 +3,6 @@ package com.clustercrew.messagequeue;
 import org.apache.bookkeeper.client.*;
 import org.apache.bookkeeper.client.BKException.BKLedgerClosedException;
 import org.apache.bookkeeper.conf.ClientConfiguration;
-import org.apache.commons.lang3.tuple.Pair;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -27,7 +26,7 @@ public class BookKeeperClient {
 
     public BookKeeperClient(String servers, ZooKeeperClient zkClient) throws Exception {
         ClientConfiguration config = new ClientConfiguration();
-        config.setMetadataServiceUri("zk+null://" + servers + "/ledgers");
+        config.setMetadataServiceUri("zk+null://127.0.0.1:2181/ledgers");
         this.bookKeeper = BookKeeper.forConfig(config).build();
         this.zkClient = zkClient;
         this.activeLedgers = new ConcurrentHashMap<>();
@@ -131,12 +130,17 @@ public class BookKeeperClient {
         List<Long> ledgerIds = zkClient.getPartitionLedgers(topic, partition);
         long currentOffset = 0;
 
-        for (long ledgerId : ledgerIds) {
-            try (LedgerHandle ledger = bookKeeper.openLedger(
-                    ledgerId,
-                    BookKeeper.DigestType.CRC32,
-                    "password".getBytes(StandardCharsets.UTF_8))) {
-                
+        for (int i = 0; i < ledgerIds.size(); i++) {
+            long ledgerId = ledgerIds.get(i);
+            boolean isActiveLedger = (i == ledgerIds.size() - 1); // The last ledger is the active one
+
+            try (LedgerHandle ledger = isActiveLedger 
+                    ? getOrCreateActiveLedger(topic, partition) 
+                    : bookKeeper.openLedger(
+                      ledgerId,
+                      BookKeeper.DigestType.CRC32,
+                      "password".getBytes(StandardCharsets.UTF_8))) {
+
                 long ledgerStart = currentOffset;
                 long ledgerEnd = currentOffset + ledger.getLastAddConfirmed() + 1;
 
@@ -160,6 +164,10 @@ public class BookKeeperClient {
                 if (messages.size() >= maxMessages) {
                     break;
                 }
+            
+            } catch (BKLedgerClosedException e) {
+                System.out.println("Ledger closed unexpectedly while reading: " + ledgerId);
+                throw new Exception("Error reading ledger " + ledgerId, e);
             }
         }
 
