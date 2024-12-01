@@ -14,9 +14,9 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
 
     private final ZooKeeperClient zkClient;
     private final BookKeeperClient bkClient;
+    private final PartitionAssigner partitionAssigner;
     private final Map<String, Map<Integer, Partition>> topicPartitions;
     private final String brokerId;
-    private final PartitionAssigner partitionAssigner;
 
     public MessageQueueServer(String zkServers, String bkServers, String brokerId) {
         this.brokerId = brokerId;
@@ -50,10 +50,32 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
      */
     private void initializeAssignedPartitions() throws Exception {
         List<Integer> assignedPartitions = zkClient.getAssignedPartitions(brokerId);
-        for (Integer partitionId : assignedPartitions) {
-            getOrCreatePartition("my-topic", partitionId); // Assume "my-topic" for simplicity
+
+        for (String topic : zkClient.getTopics()) {
+            for (Integer partitionId : assignedPartitions) {
+                if (!zkClient.partitionExists(topic, partitionId))
+                    continue;
+                getOrCreatePartition(topic, partitionId);
+            }
         }
-        System.out.println("Initialized partitions for broker: " + assignedPartitions);
+
+        System.out.println("Initialized partitions for broker: " + brokerId);
+    }
+
+    /**
+     * Handles failover scenarios by reassigning partitions from inactive brokers.
+     */
+    private void handleFailover() throws Exception {
+        zkClient.watchBrokers();
+        List<String> activeBrokers = zkClient.getActiveBrokers();
+
+        for (String topic : zkClient.getTopics()) {
+            partitionAssigner.rebalancePartitions(topic, activeBrokers);
+        }
+
+        // Reinitialize assigned partitions for this broker
+        initializeAssignedPartitions();
+        System.out.println("Failover handling complete for broker: " + brokerId);
     }
 
     @Override
@@ -160,6 +182,14 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
         }
     }
 
+    /**
+     * Fetches or creates a partition instance.
+     *
+     * @param topic     The topic name.
+     * @param partition The partition ID.
+     * @return The Partition instance.
+     * @throws Exception If an error occurs while creating the partition.
+     */
     private Partition getOrCreatePartition(String topic, int partition) throws Exception {
         synchronized (topicPartitions) {
             topicPartitions.computeIfAbsent(topic, k -> new HashMap<>());
