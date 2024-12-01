@@ -17,6 +17,9 @@ public class ZooKeeperClient {
             }
         });
         this.partitionAssigner = new PartitionAssigner(this);
+        ensurePathExists("/brokers");
+        ensurePathExists("/topics");
+
     }
 
     /**
@@ -75,9 +78,7 @@ public class ZooKeeperClient {
      * @throws Exception If an error occurs while fetching the topics.
      */
     public List<String> getTopics() throws Exception {
-        String topicsPath = "/topics";
-        ensurePathExists(topicsPath);
-        return zk.getChildren(topicsPath, false);
+        return zk.getChildren("/topics", false);
     }
 
     /**
@@ -129,23 +130,31 @@ public class ZooKeeperClient {
      * @throws Exception If an error occurs while registering the broker.
      */
     public void registerBroker(String brokerId) throws Exception {
-        String path = "/brokers/" + brokerId;
-        ensurePathExists(path);
+        String brokerPath = "/brokers/" + brokerId;
+        if (zk.exists(brokerPath, false) == null) {
+            zk.create(brokerPath, new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+        }
         System.out.println("Broker registered: " + brokerId);
+        watchBrokers();
+    }
 
-        // Assign unallocated partitions
-        List<String> topics = getTopics();
-
-        for (String topic : topics) {
-            List<String> partitions = getPartitions(topic);
-
-            for (String partitionId : partitions) {
-                if (getPartitionBroker(topic, Integer.parseInt(partitionId)) == null) {
-                    partitionAssigner.assignPartitions(topic, partitions.size(), getActiveBrokers());
-                    break;
+    /**
+     * Watches for changes in the brokers (e.g., addition, removal, or failure).
+     */
+    public void watchBrokers() throws Exception {
+        zk.getChildren("/brokers", event -> {
+            if (event.getType() == Watcher.Event.EventType.NodeChildrenChanged) {
+                try {
+                    System.out.println("Broker change detected. Rebalancing partitions...");
+                    List<String> activeBrokers = getActiveBrokers();
+                    for (String topic : getTopics()) {
+                        partitionAssigner.rebalancePartitions(topic, activeBrokers);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
                 }
             }
-        }
+        });
     }
 
     /**
@@ -155,9 +164,7 @@ public class ZooKeeperClient {
      * @throws Exception If an error occurs while fetching the broker list.
      */
     public List<String> getActiveBrokers() throws Exception {
-        String path = "/brokers";
-        ensurePathExists(path);
-        return zk.getChildren(path, false);
+        return zk.getChildren("/brokers", false);
     }
 
     /**
@@ -181,6 +188,20 @@ public class ZooKeeperClient {
         zk.setData(topicPartitionPath, brokerId.getBytes(StandardCharsets.UTF_8), -1);
 
         System.out.println("Partition " + partition + " of topic " + topic + " assigned to broker " + brokerId);
+    }
+
+    /**
+     * Reassigns a partition to a new broker in the event of a failure.
+     *
+     * @param topic       The topic name.
+     * @param partition   The partition number.
+     * @param newBrokerId The new broker ID.
+     * @throws Exception If an error occurs while reassigning the partition.
+     */
+    public void reassignPartition(String topic, int partition, String newBrokerId) throws Exception {
+        String partitionPath = "/topics/" + topic + "/partitions/" + partition + "/broker";
+        zk.setData(partitionPath, newBrokerId.getBytes(StandardCharsets.UTF_8), -1);
+        System.out.println("Partition " + partition + " of topic " + topic + " reassigned to broker " + newBrokerId);
     }
 
     /**

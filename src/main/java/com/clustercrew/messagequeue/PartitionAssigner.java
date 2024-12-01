@@ -11,7 +11,7 @@ public class PartitionAssigner {
 
     /**
      * Assigns partitions of a topic to the given list of brokers.
-     * This uses a round-robin strategy to distribute partitions evenly.
+     * Uses a round-robin strategy to distribute partitions evenly.
      *
      * @param topic         The topic name.
      * @param numPartitions The total number of partitions for the topic.
@@ -20,25 +20,15 @@ public class PartitionAssigner {
      */
     public void assignPartitions(String topic, int numPartitions, List<String> brokerIds) throws Exception {
         if (brokerIds.isEmpty()) {
-            System.out.println("No active brokers available for partition assignment");
-            return;
+            throw new Exception("No active brokers available for partition assignment");
         }
 
         System.out.println("Assigning " + numPartitions + " partitions for topic: " + topic);
 
-        // Determine how many brokers can be used
-        int brokersAvailable = Math.min(numPartitions, brokerIds.size());
-
-        for (int i = 0; i < brokersAvailable; i++) {
-            // Directly assign each partition to a unique broker
-            String brokerId = brokerIds.get(i);
-            zkClient.assignPartitionToBroker(topic, i, brokerId);
-            System.out.println("Partition " + i + " assigned to broker " + brokerId);
-        }
-
-        // Log unassigned partitions if brokers are insufficient
-        for (int i = brokersAvailable; i < numPartitions; i++) {
-            System.out.println("Partition " + i + " for topic " + topic + " remains unassigned due to insufficient brokers");
+        for (int partition = 0; partition < numPartitions; partition++) {
+            String brokerId = brokerIds.get(partition % brokerIds.size());
+            zkClient.assignPartitionToBroker(topic, partition, brokerId);
+            System.out.println("Partition " + partition + " assigned to broker " + brokerId);
         }
     }
 
@@ -53,7 +43,7 @@ public class PartitionAssigner {
      */
     public void rebalancePartitions(String topic, List<String> brokerIds) throws Exception {
         if (brokerIds.isEmpty()) {
-            throw new Exception("No active brokers available for rebalancing");
+            throw new Exception("No active brokers available for rebalancing.");
         }
 
         List<String> partitions = zkClient.getPartitions(topic);
