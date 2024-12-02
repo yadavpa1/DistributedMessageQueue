@@ -4,6 +4,8 @@
 #include <grpcpp/grpcpp.h>
 #include "message_queue.grpc.pb.h"
 
+int total_partitions = 3;
+
 // Define the implementation class that was forward-declared in the header
 class Producer::Impl {
 public:
@@ -13,21 +15,17 @@ public:
     bool ProduceMessage(const std::string& key, const std::string& value, const std::string& topic,
                         const std::string& producer_id, const std::string& ack_mode) {
         try {
-            // Ensure metadata for the topic is available
-            router_->UpdateMetadata(topic);
-
-            // Fetch total partitions and compute the target partition
-            int total_partitions = router_->GetTotalPartitions(topic);
+            // Compute the target partition using key. total_partition is fixed to be 3.
             int partition = std::hash<std::string>{}(key) % total_partitions;
 
-            // Get leader for partition
-            std::string leader = router_->GetLeader(topic, partition);
+            // Get broker_ip for partition
+            std::string broker_ip = router_->GetBrokerIP(topic, partition);
 
-            std::cout << "Routing message to leader: " << leader << " for topic: " << topic
+            std::cout << "Routing message to broker at: " << broker_ip << " for topic: " << topic
                       << ", partition: " << partition << std::endl;
 
-            // Create gRPC stub for the leader
-            auto channel = grpc::CreateChannel(leader, grpc::InsecureChannelCredentials());
+            // Create gRPC stub for the broker_ip
+            auto channel = grpc::CreateChannel(broker_ip, grpc::InsecureChannelCredentials());
             auto stub = message_queue::MessageQueue::NewStub(channel);
 
             // Prepare the message
@@ -35,6 +33,7 @@ public:
             message.set_key(key);
             message.set_value(value);
             message.set_topic(topic);
+            message.set_partition(partition);
             message.set_timestamp(time(nullptr)); // Current timestamp
 
             // Prepare the request

@@ -1,33 +1,25 @@
 #include "router.h"
 #include <iostream>
 #include <thread>
+#include <algorithm> // For std::shuffle
+#include <random>    // For std::random_device and std::mt19937
 
-Router::Router(const std::vector<std::string>& bootstrap_servers) {
+Router::Router(const std::vector<std::string>& bootstrap_servers)
+    : bootstrap_servers_(bootstrap_servers) { // Initialize bootstrap servers
     // Iterate over bootstrap servers to find a reachable one
-    for (const auto& server : bootstrap_servers) {
-        try {
-            auto channel = grpc::CreateChannel(server, grpc::InsecureChannelCredentials());
-            stub_ = message_queue::MessageQueue::NewStub(channel);
-            std::cout << "Connected to bootstrap server: " << server << std::endl;
-            break;
-        } catch (const std::exception& e) {
-            std::cerr << "Failed to connect to bootstrap server: " << server << " - " << e.what() << std::endl;
-        }
-    }
-
-    if (!stub_) {
+    if (!ConnectToBootstrapServer()) {
         throw std::runtime_error("Failed to connect to any bootstrap server");
     }
 }
 
-std::string Router::GetLeader(const std::string& topic, int partition) {
+std::string Router::GetBrokerIP(const std::string& topic, int partition) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (routing_table_.count(topic) && routing_table_[topic].count(partition)) {
         return routing_table_[topic][partition];
     }
 
     // If partition leader is not found for a paritcular topic then fetch metadata for that topic
-    std::cerr << "Leader not found for topic: " << topic << ", partition: " << partition
+    std::cout << "Broker IP not found for topic: " << topic << ", partition: " << partition
               << ". Refreshing metadata..." << std::endl;
 
     FetchMetadata(topic);
@@ -38,25 +30,31 @@ std::string Router::GetLeader(const std::string& topic, int partition) {
     throw std::runtime_error("Failed to find leader after metadata refresh");
 }
 
-int Router::GetTotalPartitions(const std::string& topic) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (topic_partitions_.count(topic)) {
-        return topic_partitions_[topic];
-    }
-    throw std::runtime_error("Partition count not available for topic: " + topic);
-}
+bool Router::ConnectToBootstrapServer() {
+    std::cout << "Attempting to connect to a random bootstrap server..." << std::endl;
 
-// Fetch metadata for a given topic only if it is not already cached
-// If using cached metadat then need to ensure that cache is updated periodically
-// Another option is to always fetch metadata from the server insted of checking if cache exists.
-void Router::UpdateMetadata(const std::string& topic) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    // if (routing_table_.count(topic) == 0) {
-    std::cout << "Fetching metadata for topic: " << topic << std::endl;
-    FetchMetadata(topic);
-    // } else {
-    //     std::cout << "Metadata for topic: " << topic << " is already cached. Reading from cache" << std::endl;
-    // }
+    // Create a copy of the bootstrap server list to shuffle
+    std::vector<std::string> shuffled_servers = bootstrap_servers_;
+
+    // Shuffle the list using a random number generator
+    std::random_device rd; // Seed for randomness
+    std::mt19937 g(rd());  // Mersenne Twister RNG
+    std::shuffle(shuffled_servers.begin(), shuffled_servers.end(), g);
+
+    // Attempt to connect to servers in the shuffled order
+    for (const auto& server : shuffled_servers) {
+        try {
+            auto channel = grpc::CreateChannel(server, grpc::InsecureChannelCredentials());
+            stub_ = message_queue::MessageQueue::NewStub(channel);
+            std::cout << "Connected to bootstrap server: " << server << std::endl;
+            return true;
+        } catch (const std::exception& e) {
+            std::cerr << "Failed to connect to bootstrap server: " << server << " - " << e.what() << std::endl;
+        }
+    }
+
+    std::cerr << "All bootstrap servers are unavailable" << std::endl;
+    return false;
 }
 
 void Router::FetchMetadata(const std::string& topic) {
@@ -73,13 +71,22 @@ void Router::FetchMetadata(const std::string& topic) {
         routing_table_[topic].clear();
         topic_partitions_[topic] = response.partitions_size();
         for (const auto& partition : response.partitions()) {
-            routing_table_[topic][partition.partition_id()] = partition.leader_address();
+            routing_table_[topic][partition.partition_id()] = partition.broker_address();
         }
     } else {
         std::cerr << "Failed to fetch metadata: " << (status.ok() ? response.error_message() : status.error_message()) << std::endl;
-        throw std::runtime_error("Metadata fetch failed");
+
+        // Attempt to reconnect to a different bootstrap server
+        if (!ConnectToBootstrapServer()) {
+            throw std::runtime_error("Metadata fetch failed and could not reconnect to a bootstrap server");
+        }
+
+        // Retry fetching metadata after reconnecting
+        std::cerr << "Retrying metadata fetch for topic: " << topic << std::endl;
+        FetchMetadata(topic);
     }
 }
+
 
 void Router::StartPeriodicMetadataRefresh(int interval_ms) {
     std::thread([this, interval_ms]() {
