@@ -14,17 +14,14 @@ public:
     }
 
     std::vector<MessageResponse> ConsumeMessage(std::string group_id, std::string topic, int partition, int offset, int max_messages) {
-        // Ensure metadata for the topic is available
-        router_->UpdateMetadata(topic);
+        // Get broker ip for partition
+        std::string broker_ip = router_->GetBrokerIP(topic, partition);
 
-        // Get leader for partition
-        std::string leader = router_->GetLeader(topic, partition);
-
-        std::cout << "Routing message to leader: " << leader << " for topic: " << topic
+        std::cout << "Routing message to broker_ip: " << broker_ip << " for topic: " << topic
                   << ", partition: " << partition << std::endl;
         
-        // Create gRPC stub for the leader
-        auto channel = grpc::CreateChannel(leader, grpc::InsecureChannelCredentials());
+        // Create gRPC stub for the broker_ip
+        auto channel = grpc::CreateChannel(broker_ip, grpc::InsecureChannelCredentials());
         auto stub_ = message_queue::MessageQueue::NewStub(channel);
 
         message_queue::ConsumeMessageRequest request;
