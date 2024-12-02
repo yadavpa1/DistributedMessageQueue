@@ -14,16 +14,16 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
 
     private final ZooKeeperClient zkClient;
     private final BookKeeperClient bkClient;
-    private final PartitionAssigner partitionAssigner;
     private final Map<String, Map<Integer, Partition>> topicPartitions;
     private final String brokerId;
+    private final String brokerAddress;
 
-    public MessageQueueServer(String zkServers, String bkServers, String brokerId) {
+    public MessageQueueServer(String zkServers, String bkServers, String brokerId, String brokerAddress) {
         this.brokerId = brokerId;
+        this.brokerAddress = brokerAddress;
         try {
             this.zkClient = new ZooKeeperClient(zkServers);
             this.bkClient = new BookKeeperClient(zkServers, zkClient);
-            this.partitionAssigner = new PartitionAssigner(zkClient);
         } catch (Exception e) {
             throw new RuntimeException("Failed to initialize MessageQueueServer", e);
         }
@@ -41,8 +41,8 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
      * Registers the broker in ZooKeeper.
      */
     private void registerBroker() throws Exception {
-        zkClient.registerBroker(brokerId);
-        System.out.println("Broker registered with ID: " + brokerId);
+        zkClient.registerBroker(brokerId, brokerAddress);
+        System.out.println("Broker registered with ID: " + brokerId + " and address: " + brokerAddress);
     }
 
     /**
@@ -181,7 +181,8 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
 
             for (String partition : partitions) {
                 int partitionId = Integer.parseInt(partition);
-                String brokerAddress = zkClient.getPartitionBroker(topic, partitionId);
+                String brokerId = zkClient.getPartitionBroker(topic, partitionId);
+                String brokerAddress = zkClient.getBrokerAddress(brokerId);
 
                 PartitionMetadata partitionMetadata = PartitionMetadata.newBuilder()
                         .setPartitionId(partitionId)
@@ -238,9 +239,10 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
         String zkServers = "localhost:2181";
         String bkServers = "";
         String brokerId = "broker-1";
+        String brokerAddress = "localhost:8080";
 
         Server server = ServerBuilder.forPort(8080)
-                .addService(new MessageQueueServer(zkServers, bkServers, brokerId))
+                .addService(new MessageQueueServer(zkServers, bkServers, brokerId, brokerAddress))
                 .build()
                 .start();
 
