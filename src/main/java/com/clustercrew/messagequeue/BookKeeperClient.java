@@ -114,6 +114,32 @@ public class BookKeeperClient {
         }
     }
 
+    public void writeMessagesBatch(String topic, int partition, List<Message> messages) throws Exception {
+        LedgerHandle ledger;
+
+        while (true) {
+            ledger = getOrCreateActiveLedger(topic, partition);
+
+            // Serialize all messages into a single byte array for batching
+            List<byte[]> serializedMessages = new ArrayList<>();
+            for (Message message : messages) {
+                serializedMessages.add(message.toByteArray());
+            }
+
+            try {
+                for (byte[] serializedMessage : serializedMessages) {
+                    ledger.addEntry(serializedMessage);
+                }
+                System.out.println("Batch of messages written to topic: " + topic + ", partition: " + partition);
+                break; // Successful write, exit loop
+            } catch (BKLedgerClosedException e) {
+                System.out.println("Ledger closed for topic: " + topic + ", partition: " + partition);
+                // Remove the closed ledger from active map and retry
+                activeLedgers.get(topic).remove(partition);
+            }
+        }
+    }
+
     /**
      * Reads messages from a topic partition ledger starting from the specified logical offset.
      *

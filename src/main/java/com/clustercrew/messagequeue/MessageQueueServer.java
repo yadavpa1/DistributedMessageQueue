@@ -6,6 +6,7 @@ import io.grpc.stub.StreamObserver;
 import com.clustercrew.messagequeue.MessageQueueOuterClass.*;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,13 +22,14 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
     public MessageQueueServer(String zkServers, String bkServers, String brokerId, String brokerAddress) {
         this.brokerId = brokerId;
         this.brokerAddress = brokerAddress;
+        this.topicPartitions = new HashMap<>();
+
         try {
             this.zkClient = new ZooKeeperClient(zkServers);
             this.bkClient = new BookKeeperClient(zkServers, zkClient);
         } catch (Exception e) {
             throw new RuntimeException("Failed to initialize MessageQueueServer", e);
         }
-        this.topicPartitions = new HashMap<>();
 
         try {
             registerBroker();
@@ -63,44 +65,45 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
     }
 
     @Override
-    public void produceMessage(ProduceMessageRequest request, StreamObserver<ProduceMessageResponse> responseObserver) {
-        Message message = request.getMessage();
-        String topic = message.getTopic();
-        int partition = message.getPartition();
+    public void produceMessages(ProduceMessagesRequest request, StreamObserver<ProduceMessagesResponse> responseObserver) {
+        List<Message> messages = request.getMessagesList();
+
+        // Group messages by topic and partition
+        Map<String, Map<Integer, List<Message>>> groupedMessages = new HashMap<>();
+        for (Message message : messages) {
+            groupedMessages
+                .computeIfAbsent(message.getTopic(), k -> new HashMap<>())
+                .computeIfAbsent(message.getPartition(), k -> new ArrayList<>())
+                .add(message);
+        }
 
         try {
-            // Check if the topic exists in ZooKeeper
-            if (!zkClient.topicExists(topic)) {
-                // Initialize topic metadata (e.g., partitions, retention, replicas)
-                int numPartitions = 3;
-                int retentionMs = 30 * 60 * 1000; // 30 mins retention
-                int replicationFactor = 3;
+            // Process each group of messages for the same topic and partition
+            for (Map.Entry<String, Map<Integer, List<Message>>> topicEntry : groupedMessages.entrySet()) {
+                String topic = topicEntry.getKey();
 
-                // Create the topic in ZooKeeper
-                zkClient.createTopic(topic, numPartitions, retentionMs, replicationFactor);
-                System.out.println("Topic created dynamically: " + topic);
-            }
+                for (Map.Entry<Integer, List<Message>> partitionEntry : topicEntry.getValue().entrySet()) {
+                    int partition = partitionEntry.getKey();
+                    List<Message> partitionMessages = partitionEntry.getValue();
 
-            // Validate if the partition exists
-            if (!zkClient.partitionExists(topic, partition)) {
-                throw new IllegalArgumentException("Partition " + partition + " does not exist for topic " + topic);
-            }
+                    // Validate if this broker is responsible for the partition
+                    String assignedBroker = zkClient.getPartitionBroker(topic, partition);
+                    if (!assignedBroker.equals(brokerId)) {
+                        throw new IllegalArgumentException(
+                                "Partition " + partition + " is not assigned to this broker.");
+                    }
 
-            // Validate if this broker is responsible for the partition
-            String assignedBroker = zkClient.getPartitionBroker(topic, partition);
-            if (!assignedBroker.equals(brokerId)) {
-                throw new IllegalArgumentException("Partition " + partition + " is not assigned to this broker.");
-            }
-            
-            Partition partitionInstance = getOrCreatePartition(topic, partition);
-            partitionInstance.appendMessage(message);
-
-            ProduceMessageResponse response = ProduceMessageResponse.newBuilder()
-                    .setSuccess(true)
-                    .build();
-            responseObserver.onNext(response);
+                    Partition partitionInstance = getOrCreatePartition(topic, partition);
+                    partitionInstance.appendMessagesBatch(partitionMessages);
+                }
+                
+                ProduceMessagesResponse response = ProduceMessagesResponse.newBuilder()
+                        .setSuccess(true)
+                        .build();
+                responseObserver.onNext(response);
+            }            
         } catch (Exception e) {
-            ProduceMessageResponse response = ProduceMessageResponse.newBuilder()
+            ProduceMessagesResponse response = ProduceMessagesResponse.newBuilder()
                     .setSuccess(false)
                     .setErrorMessage(e.getMessage())
                     .build();
@@ -111,7 +114,7 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
     }
 
     @Override
-    public void consumeMessage(ConsumeMessageRequest request, StreamObserver<ConsumeMessageResponse> responseObserver) {
+    public void consumeMessages(ConsumeMessagesRequest request, StreamObserver<ConsumeMessagesResponse> responseObserver) {
         String groupId = request.getGroupId();
         String topic = request.getTopic();
         int partition = request.getPartition();
@@ -119,20 +122,21 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
         int maxMessages = request.getMaxMessages();
 
         try {
+            // Check if max_messages is 0 (set offset mode)
+            if (maxMessages == 0) {
+                zkClient.updateConsumerOffset(groupId, topic, partition, startOffset);
+                ConsumeMessagesResponse response = ConsumeMessagesResponse.newBuilder()
+                        .setSuccess(true)
+                        .build();
+                responseObserver.onNext(response);
+                responseObserver.onCompleted();
+                return; // Skip normal message fetching
+            }
+
             // Validate if this broker is responsible for the partition
             String assignedBroker = zkClient.getPartitionBroker(topic, partition);
             if (!assignedBroker.equals(brokerId)) {
                 throw new IllegalArgumentException("Partition " + partition + " is not assigned to this broker.");
-            }
-
-            // Check if max_messages is 0 (set offset mode)
-            if (maxMessages == 0) {
-                zkClient.updateConsumerOffset(groupId, topic, partition, startOffset);
-                ConsumeMessageResponse response = ConsumeMessageResponse.newBuilder()
-                        .setSuccess(true)
-                        .build();
-                responseObserver.onNext(response);
-                return; // Skip normal message fetching
             }
 
             Partition partitionInstance = getPartition(topic, partition);
@@ -147,16 +151,13 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
             long newOffset = startOffset + messages.size();
             zkClient.updateConsumerOffset(groupId, topic, partition, newOffset);
 
-            ConsumeMessageResponse.Builder responseBuilder = ConsumeMessageResponse.newBuilder()
-                    .setSuccess(true);
-            
-            for (Message msg : messages) {
-                responseBuilder.addMessages(msg);
-            }
+            ConsumeMessagesResponse.Builder responseBuilder = ConsumeMessagesResponse.newBuilder()
+                    .setSuccess(true)
+                    .addAllMessages(messages);
 
             responseObserver.onNext(responseBuilder.build());
         } catch (Exception e) {
-            ConsumeMessageResponse response = ConsumeMessageResponse.newBuilder()
+            ConsumeMessagesResponse response = ConsumeMessagesResponse.newBuilder()
                     .setSuccess(false)
                     .setErrorMessage(e.getMessage())
                     .build();
@@ -171,8 +172,16 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
         String topic = request.getTopic();
 
         try {
+            // Create topic and partitions if the topic does not exist
             if (!zkClient.topicExists(topic)) {
-                throw new IllegalArgumentException("Topic " + topic + " does not exist.");
+                // Initialize topic metadata (e.g., partitions, retention, replicas)
+                int numPartitions = 3;
+                int retentionMs = 30 * 60 * 1000; // 30 mins retention
+                int replicationFactor = 3;
+
+                // Create the topic in ZooKeeper
+                zkClient.createTopic(topic, numPartitions, retentionMs, replicationFactor);
+                System.out.println("Topic created dynamically: " + topic);
             }
 
             List<String> partitions = zkClient.getPartitions(topic);
@@ -204,14 +213,6 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
         }
     }
 
-    /**
-     * Fetches or creates a partition instance.
-     *
-     * @param topic     The topic name.
-     * @param partition The partition ID.
-     * @return The Partition instance.
-     * @throws Exception If an error occurs while creating the partition.
-     */
     private Partition getOrCreatePartition(String topic, int partition) throws Exception {
         synchronized (topicPartitions) {
             topicPartitions.computeIfAbsent(topic, k -> new HashMap<>());

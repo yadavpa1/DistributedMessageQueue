@@ -41,6 +41,20 @@ public class Partition {
         System.out.println("Message appended to partition: " + topic + " - " + partition);
     }
 
+    public void appendMessagesBatch(List<Message> messages) throws Exception {
+        if (messages.isEmpty())
+            return;
+
+        // Write the batch of messages to the active ledger
+        bkClient.writeMessagesBatch(topic, partition, messages);
+
+        // Increment the logical offset after appending
+        long currentOffset = zkClient.getPartitionLogicalOffset(topic, partition);
+        zkClient.setPartitionLogicalOffset(topic, partition, currentOffset + messages.size());
+
+        System.out.println("Batch of messages appended to partition: " + topic + " - " + partition);
+    }
+
     /**
      * Fetch messages from the partition starting from the given offset.
      *
