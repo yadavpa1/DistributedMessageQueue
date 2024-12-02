@@ -62,22 +62,6 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
         System.out.println("Initialized partitions for broker: " + brokerId);
     }
 
-    /**
-     * Handles failover scenarios by reassigning partitions from inactive brokers.
-     */
-    private void handleFailover() throws Exception {
-        zkClient.watchBrokers();
-        List<String> activeBrokers = zkClient.getActiveBrokers();
-
-        for (String topic : zkClient.getTopics()) {
-            partitionAssigner.rebalancePartitions(topic, activeBrokers);
-        }
-
-        // Reinitialize assigned partitions for this broker
-        initializeAssignedPartitions();
-        System.out.println("Failover handling complete for broker: " + brokerId);
-    }
-
     @Override
     public void produceMessage(ProduceMessageRequest request, StreamObserver<ProduceMessageResponse> responseObserver) {
         Message message = request.getMessage();
@@ -173,6 +157,43 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
             responseObserver.onNext(responseBuilder.build());
         } catch (Exception e) {
             ConsumeMessageResponse response = ConsumeMessageResponse.newBuilder()
+                    .setSuccess(false)
+                    .setErrorMessage(e.getMessage())
+                    .build();
+            responseObserver.onNext(response);
+        } finally {
+            responseObserver.onCompleted();
+        }
+    }
+
+    @Override
+    public void getMetadata(MetadataRequest request, StreamObserver<MetadataResponse> responseObserver) {
+        String topic = request.getTopic();
+
+        try {
+            if (!zkClient.topicExists(topic)) {
+                throw new IllegalArgumentException("Topic " + topic + " does not exist.");
+            }
+
+            List<String> partitions = zkClient.getPartitions(topic);
+            MetadataResponse.Builder responseBuilder = MetadataResponse.newBuilder()
+                    .setSuccess(true);
+
+            for (String partition : partitions) {
+                int partitionId = Integer.parseInt(partition);
+                String brokerAddress = zkClient.getPartitionBroker(topic, partitionId);
+
+                PartitionMetadata partitionMetadata = PartitionMetadata.newBuilder()
+                        .setPartitionId(partitionId)
+                        .setBrokerAddress(brokerAddress)
+                        .build();
+
+                responseBuilder.addPartitions(partitionMetadata);
+            }
+
+            responseObserver.onNext(responseBuilder.build());
+        } catch (Exception e) {
+            MetadataResponse response = MetadataResponse.newBuilder()
                     .setSuccess(false)
                     .setErrorMessage(e.getMessage())
                     .build();

@@ -46,17 +46,16 @@ message ConsumeMessageResponse {
 }
 
 message MetadataRequest {
-    string topic = 1; // Name of the topic to fetch metadata for
-}
-
-message PartitionMetadata {
-    int32 partition_id = 1;        // Partition ID
-    string leader_address = 2;    // Address of the leader for this partition
+    string topic = 1;
 }
 
 message MetadataResponse {
-    string topic = 1;                         // Topic name
-    repeated PartitionMetadata partitions = 2; // Metadata for each partition
-    bool success = 3;                         // Whether the operation was successful
-    string error_message = 4;                 // Error message if applicable
+    repeated PartitionMetadata partitions = 1; // Metadata for partitions
+    bool success = 2;                          // Indicates success of the operation
+    string error_message = 3;                  // Error message if applicable
+}
+
+message PartitionMetadata {
+    int32 partition_id = 1;
+    string broker_address = 2;
 }
