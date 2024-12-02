@@ -129,12 +129,13 @@ public class ZooKeeperClient {
      * @param brokerId The ID of the broker.
      * @throws Exception If an error occurs while registering the broker.
      */
-    public void registerBroker(String brokerId) throws Exception {
+    public void registerBroker(String brokerId, String brokerAddress) throws Exception {
         String brokerPath = "/brokers/" + brokerId;
         if (zk.exists(brokerPath, false) == null) {
-            zk.create(brokerPath, new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+            zk.create(brokerPath, brokerAddress.getBytes(StandardCharsets.UTF_8), ZooDefs.Ids.OPEN_ACL_UNSAFE, 
+                CreateMode.EPHEMERAL);
         }
-        System.out.println("Broker registered: " + brokerId);
+        System.out.println("Broker registered: " + brokerId + " with address: " + brokerAddress);
         watchBrokers();
     }
 
@@ -165,6 +166,23 @@ public class ZooKeeperClient {
      */
     public List<String> getActiveBrokers() throws Exception {
         return zk.getChildren("/brokers", false);
+    }
+
+    /**
+     * Retrieves the address of a broker by its ID.
+     *
+     * @param brokerId The broker ID.
+     * @return The broker address.
+     * @throws Exception If an error occurs while fetching the address.
+     */
+    public String getBrokerAddress(String brokerId) throws Exception {
+        String brokerPath = "/brokers/" + brokerId;
+        Stat stat = zk.exists(brokerPath, false);
+        if (stat == null) {
+            throw new Exception("Broker " + brokerId + " not found in ZooKeeper.");
+        }
+        byte[] data = zk.getData(brokerPath, false, null);
+        return new String(data, StandardCharsets.UTF_8);
     }
 
     /**
