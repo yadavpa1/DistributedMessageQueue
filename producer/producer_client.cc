@@ -4,18 +4,25 @@
 #include <vector>
 
 void RunProducerClient(const std::vector<std::string>& bootstrap_servers) {
-    Producer producer(bootstrap_servers);
-
-    std::string key, value, topic, producer_id, ack_mode;
-
+    std::string producer_id;
     std::cout << "Enter Producer ID: ";
     std::getline(std::cin, producer_id);
 
+    int flush_threshold;
+    std::cout << "Enter Flush Threshold: ";
+    std::cin >> flush_threshold;
+
+    int flush_interval_ms;
+    std::cout << "Enter Flush Interval (ms): ";
+    std::cin >> flush_interval_ms;
+
+    Producer producer(bootstrap_servers, flush_threshold, flush_interval_ms, producer_id);
+
+    std::string key, value, topic;
+
+
     std::cout << "Enter Topic: ";
     std::getline(std::cin, topic);
-
-    std::cout << "Enter Acknowledgment Mode (e.g., sync/async): ";
-    std::getline(std::cin, ack_mode);
 
     while (true) {
         std::cout << "\nEnter a message (key value) or type 'exit' to quit:\n";
@@ -33,7 +40,7 @@ void RunProducerClient(const std::vector<std::string>& bootstrap_servers) {
             break;
         }
 
-        bool success = producer.ProduceMessage(key, value, topic, producer_id, ack_mode);
+        bool success = producer.ProduceMessage(key, value, topic);
         if (success) {
             std::cout << "Message sent successfully." << std::endl;
         } else {

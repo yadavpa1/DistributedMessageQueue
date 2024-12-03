@@ -4,5 +4,5 @@ build
 .gradle
 bin
 zookeeper_data
-bookkeeper_data
+bookkeeper*
 docker-compose.yml
