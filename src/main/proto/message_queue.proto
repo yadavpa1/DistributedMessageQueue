@@ -20,10 +20,9 @@ message Message {
     optional int64 size = 7; // Size of the message
 }
 
-message ProduceMessagesRequest {
-    repeated Message messages = 1;     // Batch of Messages
-    string producer_id = 2;  // ID of the producer
-    string ack_mode = 3;     // Acknowledgment mode (e.g., "all", "1", "0")
+message ProduceMessageRequest {
+    repeated Message message = 1;     // Message details
+    string producer_id = 2;           // ID of the producer
 }
 
 message ProduceMessagesResponse {
