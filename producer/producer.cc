@@ -56,9 +56,10 @@ public:
                 message_map_[broker_ip].push_back(message);
                 if (message_map_[broker_ip].size() >= flush_threshold_) {
                     FlushMessages(broker_ip);
+                    message_map_[broker_ip].clear();
                 }
 
-                if(broker_timers_.find(broker_ip) == broker_timers_.end()) {
+                if(broker_timers_.find(broker_ip) == broker_timers_.end() && message_map_[broker_ip].size() > 0) {
                     broker_timers_[broker_ip] = std::thread(&Impl::FlushMessagesPeriodically, this, broker_ip);
                 }
             }
@@ -97,11 +98,6 @@ private:
             } else {
                 std::cerr << "Failed to produce messages to broker at: " << broker_ip << std::endl;
             }
-
-            {
-                std::lock_guard<std::mutex> lock(mutex_);
-                message_map_[broker_ip].clear();
-            }
         }
     }
 
@@ -112,6 +108,7 @@ private:
                 std::lock_guard<std::mutex> lock(mutex_);
                 if(!message_map_[broker_ip].empty()) {
                     FlushMessages(broker_ip);
+                    message_map_[broker_ip].clear();
                 }
             }
         }
