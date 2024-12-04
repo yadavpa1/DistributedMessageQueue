@@ -131,31 +131,14 @@ public class ZooKeeperClient {
      */
     public void registerBroker(String brokerId, String brokerAddress) throws Exception {
         String brokerPath = "/brokers/" + brokerId;
-        if (zk.exists(brokerPath, false) == null) {
-            zk.create(brokerPath, brokerAddress.getBytes(StandardCharsets.UTF_8), ZooDefs.Ids.OPEN_ACL_UNSAFE, 
-                CreateMode.EPHEMERAL);
-        }
-        System.out.println("Broker registered: " + brokerId + " with address: " + brokerAddress);
-        watchBrokers();
-    }
 
-    /**
-     * Watches for changes in the brokers (e.g., addition, removal, or failure).
-     */
-    public void watchBrokers() throws Exception {
-        zk.getChildren("/brokers", event -> {
-            if (event.getType() == Watcher.Event.EventType.NodeChildrenChanged) {
-                try {
-                    System.out.println("Broker change detected. Rebalancing partitions...");
-                    List<String> activeBrokers = getActiveBrokers();
-                    for (String topic : getTopics()) {
-                        partitionAssigner.rebalancePartitions(topic, activeBrokers);
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        });
+        // Create a persistent node for the broker to store partitions
+        if (zk.exists(brokerPath, false) == null) {
+            zk.create(brokerPath, brokerAddress.getBytes(StandardCharsets.UTF_8), ZooDefs.Ids.OPEN_ACL_UNSAFE,
+                    CreateMode.PERSISTENT);
+        }
+        
+        System.out.println("Broker registered: " + brokerId + " with address: " + brokerAddress);
     }
 
     /**
