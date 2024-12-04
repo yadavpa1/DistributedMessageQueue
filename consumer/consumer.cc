@@ -24,17 +24,17 @@ public:
         auto channel = grpc::CreateChannel(broker_ip, grpc::InsecureChannelCredentials());
         auto stub_ = message_queue::MessageQueue::NewStub(channel);
 
-        message_queue::ConsumeMessageRequest request;
+        message_queue::ConsumeMessagesRequest request;
         request.set_group_id(group_id);
         request.set_topic(topic);
         request.set_partition(partition);
         request.set_start_offset(offset);
         request.set_max_messages(max_messages);
 
-        message_queue::ConsumeMessageResponse response;
+        message_queue::ConsumeMessagesResponse response;
         grpc::ClientContext context;
 
-        grpc::Status status = stub_->ConsumeMessage(&context, request, &response);
+        grpc::Status status = stub_->ConsumeMessages(&context, request, &response);
 
         if (!status.ok()) {
             std::cerr << "gRPC error: " << status.error_code() << ": " << status.error_message() << std::endl;

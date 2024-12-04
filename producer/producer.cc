@@ -83,15 +83,15 @@ private:
             auto channel = grpc::CreateChannel(broker_ip, grpc::InsecureChannelCredentials());
             auto stub = message_queue::MessageQueue::NewStub(channel);
 
-            message_queue::ProduceMessageRequest request;
+            message_queue::ProduceMessagesRequest request;
             for(const auto &message: messages) {
                 *request.add_message() = message;
             }
             request.set_producer_id(producer_id);
 
-            message_queue::ProduceMessageResponse response;
+            message_queue::ProduceMessagesResponse response;
             grpc::ClientContext context;
-            grpc::Status status = stub->ProduceMessage(&context, request, &response);
+            grpc::Status status = stub->ProduceMessages(&context, request, &response);
             if(status.ok() && response.success()) {
                 std::cout << "Successfully produced " << messages.size() << " messages to broker at: " << broker_ip << std::endl;
             } else {

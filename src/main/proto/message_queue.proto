@@ -20,7 +20,7 @@ message Message {
     optional int64 size = 7; // Size of the message
 }
 
-message ProduceMessageRequest {
+message ProduceMessagesRequest {
     repeated Message message = 1;     // Message details
     string producer_id = 2;           // ID of the producer
 }
