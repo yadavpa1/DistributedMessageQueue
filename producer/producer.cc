@@ -85,7 +85,7 @@ private:
 
             message_queue::ProduceMessagesRequest request;
             for(const auto &message: messages) {
-                *request.add_message() = message;
+                *request.add_messages() = message;
             }
             request.set_producer_id(producer_id);
 
