@@ -58,9 +58,9 @@ public:
                     FlushMessages(broker_ip);
                 }
 
-                if(broker_timers_.find(broker_ip) == broker_timers_.end()) {
-                    broker_timers_[broker_ip] = std::thread(&Impl::FlushMessagesPeriodically, this, broker_ip);
-                }
+                // if(broker_timers_.find(broker_ip) == broker_timers_.end()) {
+                //     broker_timers_[broker_ip] = std::thread(&Impl::FlushMessagesPeriodically, this, broker_ip);
+                // }
             }
             return true;
         } catch (const std::exception& e) {

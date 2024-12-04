@@ -237,17 +237,22 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
     }
 
     public static void main(String[] args) throws IOException, InterruptedException {
-        String zkServers = "localhost:2181";
-        String bkServers = "";
-        String brokerId = "broker-1";
-        String brokerAddress = "localhost:8080";
-
-        Server server = ServerBuilder.forPort(8080)
+        if (args.length != 4) {
+            System.err.println("Usage: java com.clustercrew.messagequeue.MessageQueueServer <zkServers> <bkServers> <brokerId> <brokerAddress>");
+            return;
+        }
+    
+        String zkServers = args[0];
+        String bkServers = args[1];
+        String brokerId = args[2];
+        String brokerAddress = args[3];
+    
+        Server server = ServerBuilder.forPort(Integer.parseInt(brokerAddress.split(":")[1]))
                 .addService(new MessageQueueServer(zkServers, bkServers, brokerId, brokerAddress))
                 .build()
                 .start();
-
-        System.out.println("Message Queue Server started at port 8080");
+    
+        System.out.println("Message Queue Server started with Broker ID: " + brokerId + " at address: " + brokerAddress);
         server.awaitTermination();
     }
 }

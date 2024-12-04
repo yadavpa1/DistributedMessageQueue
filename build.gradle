@@ -82,5 +82,5 @@ tasks.test {
 
 application {
     // Main class to run
-    mainClass = 'com.clustercrew.messagequeue.MessageQueueServer'
+    mainClass = 'com.clustercrew.messagequeue.MessageQueueCluster'
 }
