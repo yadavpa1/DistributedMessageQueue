@@ -22,19 +22,19 @@ void RunProducerClient(const std::vector<std::string>& bootstrap_servers) {
 
 
     std::cout << "Enter Topic: ";
-    std::getline(std::cin, topic);
+    std::cin >> topic;
 
     while (true) {
         std::cout << "\nEnter a message (key value) or type 'exit' to quit:\n";
         std::cout << "Key: ";
-        std::getline(std::cin, key);
+        std::cin >> key;
 
         if (key == "exit") {
             break;
         }
 
         std::cout << "Value: ";
-        std::getline(std::cin, value);
+        std::cin >> value;
 
         if (value == "exit") {
             break;
