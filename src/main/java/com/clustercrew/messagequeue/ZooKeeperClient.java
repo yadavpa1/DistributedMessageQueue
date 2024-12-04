@@ -14,6 +14,14 @@ public class ZooKeeperClient {
         this.zk = new ZooKeeper(zkServers, 3000, event -> {
             if (event.getState() == Watcher.Event.KeeperState.SyncConnected) {
                 System.out.println("Connected to ZooKeeper");
+                
+            } else if (event.getType() == Watcher.Event.EventType.NodeChildrenChanged
+                    && event.getPath().equals("/brokers")) {
+                try {
+                    rebalanceAllTopics();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         });
         this.partitionAssigner = new PartitionAssigner(this);
@@ -93,6 +101,22 @@ public class ZooKeeperClient {
         return zk.exists(topicPath, false) != null;
     }
 
+    /**
+     * Rebalances all topics across the active brokers.
+     */
+    private void rebalanceAllTopics() throws Exception {
+        List<String> activeBrokers = getActiveBrokers();
+        List<String> topics = getTopics();
+
+        if (activeBrokers.isEmpty()) {
+            throw new Exception("No active brokers available for rebalancing.");
+        }
+
+        for (String topic : topics) {
+            partitionAssigner.rebalancePartitions(topic, activeBrokers);
+        }
+    }
+
     // ---------------------------------- Partition Management ----------------------------------
 
     /**
@@ -136,6 +160,9 @@ public class ZooKeeperClient {
         if (zk.exists(brokerPath, false) == null) {
             zk.create(brokerPath, brokerAddress.getBytes(StandardCharsets.UTF_8), ZooDefs.Ids.OPEN_ACL_UNSAFE,
                     CreateMode.PERSISTENT);
+
+            // Rebalance partitions across all topics
+            rebalanceAllTopics();
         }
         
         System.out.println("Broker registered: " + brokerId + " with address: " + brokerAddress);
