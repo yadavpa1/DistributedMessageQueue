@@ -14,6 +14,7 @@ public class MessageQueueCluster {
         List<Process> processes = new ArrayList<>();
 
         try {
+            // Start multiple server processes
             for (int i = 0; i < numberOfServers; i++) {
                 String brokerId = "broker-" + (i + 1);
                 String brokerAddress = "localhost:" + (startingPort + i);
@@ -29,7 +30,7 @@ public class MessageQueueCluster {
                 command.add(brokerId);
                 command.add(brokerAddress);
 
-                // Create and start the process
+                // Start the process
                 ProcessBuilder processBuilder = new ProcessBuilder(command);
                 processBuilder.inheritIO(); // To inherit console output
                 Process process = processBuilder.start();
@@ -38,17 +39,22 @@ public class MessageQueueCluster {
                 System.out.println("Started Message Queue Server with Broker ID: " + brokerId + " on port " + (startingPort + i));
             }
 
-            // Wait for all processes to complete (if needed)
-            for (Process process : processes) {
-                process.waitFor();
-            }
-        } catch (IOException | InterruptedException e) {
+            // Wait for all servers to run indefinitely
+            System.out.println("Servers are running. Use CTRL+C to stop.");
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                for (Process process : processes) {
+                    process.destroy();
+                }
+                System.out.println("All servers have been stopped.");
+            }));
+
+            // Block the main thread
+            Thread.currentThread().join();
+
+        } catch (IOException e) {
             System.err.println("Failed to start server processes: " + e.getMessage());
-        } finally {
-            // Optionally destroy all processes on exit
-            for (Process process : processes) {
-                process.destroy();
-            }
+        } catch (InterruptedException e) {
+            System.err.println("Cluster interrupted.");
         }
     }
 }
