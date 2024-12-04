@@ -30,6 +30,23 @@ std::string Router::GetBrokerIP(const std::string& topic, int partition) {
     throw std::runtime_error("Failed to find leader after metadata refresh");
 }
 
+std::string Router::GetBrokerIP(const std::string& broker_id) {
+    message_queue::BrokerAddressRequest request;
+    request.set_broker_id(broker_id);
+
+    message_queue::BrokerAddressResponse response;
+    grpc::ClientContext context;
+    grpc::Status status = stub_->GetBrokerAddress(&context, request, &response);
+
+    if (status.ok() && response.success()) {
+        return response.broker_address();
+    }
+
+    std::cerr << "Failed to get broker address for broker ID: " << broker_id << " - " << (status.ok() ? response.error_message() : status.error_message()) << std::endl;
+
+    return "";
+}
+
 bool Router::ConnectToBootstrapServer() {
     std::cout << "Attempting to connect to a random bootstrap server..." << std::endl;
 

@@ -111,6 +111,7 @@ public class ZooKeeperClient {
         if (activeBrokers.isEmpty()) {
             throw new Exception("No active brokers available for rebalancing.");
         }
+        System.out.println("Rebalancing partitions across all topics...");
 
         for (String topic : topics) {
             partitionAssigner.rebalancePartitions(topic, activeBrokers);

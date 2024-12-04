@@ -8,8 +8,8 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/common.cmake")
 find_package(absl CONFIG REQUIRED)
 
 # Find RocksDB
-find_package(RocksDB CONFIG REQUIRED)
-message(STATUS "RocksDB found at: ${ROCKSDB_LIB}")
+# find_package(RocksDB CONFIG REQUIRED)
+# message(STATUS "RocksDB found at: ${ROCKSDB_LIB}")
 
 # Proto file
 get_filename_component(dmq_proto "./src/main/proto/message_queue.proto" ABSOLUTE)
@@ -37,6 +37,7 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/common")
 # include_directories("${CMAKE_CURRENT_SOURCE_DIR}/message_queue_server")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/producer")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/consumer")
+include_directories("${CMAKE_CURRENT_BINARY_DIR}/sys_admin")
 
 # dmq_grpc_proto library
 add_library(dmq_grpc_proto
@@ -124,6 +125,28 @@ add_executable(producer_client
 )
 target_link_libraries(producer_client
     producer
+)
+
+# System admin library
+add_library(sys_admin SHARED 
+    sys_admin/sys_admin.cc
+    common/router.cc
+)
+
+target_link_libraries(sys_admin
+    dmq_grpc_proto
+    absl::flags_parse
+    absl::log_initialize
+    absl::log_globals
+    -static-libstdc++ -static-libgcc
+)
+
+# System admin client executable
+add_executable(sys_admin_client
+    sys_admin/sys_admin_client.cc
+)
+target_link_libraries(sys_admin_client
+    sys_admin
 )
 
 # Set compiler flags for position-independent code for building shared libraries
