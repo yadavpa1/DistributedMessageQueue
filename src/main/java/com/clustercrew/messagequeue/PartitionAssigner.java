@@ -25,9 +25,22 @@ public class PartitionAssigner {
 
         System.out.println("Assigning " + numPartitions + " partitions for topic: " + topic);
 
+        // Calculate current load on each broker
+        Map<String, Integer> brokerLoad = calculateBrokerLoad(brokerIds);
+
+        // Priority queue to pick brokers with the least load
+        PriorityQueue<String> brokerQueue = new PriorityQueue<>(Comparator.comparingInt(brokerLoad::get));
+        brokerQueue.addAll(brokerIds);
+
         for (int partition = 0; partition < numPartitions; partition++) {
-            String brokerId = brokerIds.get(partition % brokerIds.size());
+            // Pick the broker with the least load
+            String brokerId = brokerQueue.poll();
             zkClient.assignPartitionToBroker(topic, partition, brokerId);
+
+            // Update the broker's load and reinsert into the queue
+            brokerLoad.put(brokerId, brokerLoad.get(brokerId) + 1);
+            brokerQueue.offer(brokerId);
+
             System.out.println("Partition " + partition + " assigned to broker " + brokerId);
         }
     }
@@ -51,36 +64,53 @@ public class PartitionAssigner {
 
         System.out.println("Rebalancing " + numPartitions + " partitions for topic: " + topic);
 
-        Map<Integer, String> currentAssignments = new HashMap<>();
+        // Calculate current load on each broker
+        Map<String, Integer> brokerLoad = calculateBrokerLoad(brokerIds);
 
-        // Retrieve current broker assignments for each partition
-        for (String partition : partitions) {
-            int partitionId = Integer.parseInt(partition);
-            try {
-                String currentBroker = zkClient.getPartitionBroker(topic, partitionId);
-                currentAssignments.put(partitionId, currentBroker);
-            } catch (Exception e) {
-                // If no broker is assigned, mark for reassignment
-                currentAssignments.put(partitionId, null);
+        // Priority queue to pick brokers with the least load
+        PriorityQueue<String> brokerQueue = new PriorityQueue<>(Comparator.comparingInt(brokerLoad::get));
+        brokerQueue.addAll(brokerIds);
+
+        for (String partitionStr : partitions) {
+            int partition = Integer.parseInt(partitionStr);
+
+            // Remove the partition's current assignment
+            String currentBroker = zkClient.getPartitionBroker(topic, partition);
+            if (brokerLoad.containsKey(currentBroker)) {
+                brokerLoad.put(currentBroker, brokerLoad.get(currentBroker) - 1);
+                brokerQueue.remove(currentBroker);
+                brokerQueue.offer(currentBroker);
             }
+
+            // Assign the partition to the broker with the least load
+            String newBroker = brokerQueue.poll();
+            zkClient.assignPartitionToBroker(topic, partition, newBroker);
+
+            // Update the broker's load and reinsert into the queue
+            brokerLoad.put(newBroker, brokerLoad.get(newBroker) + 1);
+            brokerQueue.offer(newBroker);
+
+            System.out.println("Partition " + partition + " reassigned to broker " + newBroker);
+
+        }
+    }
+
+    /**
+     * Calculates the current load (number of partitions assigned) on each broker.
+     *
+     * @param brokerIds List of active broker IDs.
+     * @return A map of broker IDs to their current load.
+     * @throws Exception If an error occurs while retrieving broker assignments.
+     */
+    private Map<String, Integer> calculateBrokerLoad(List<String> brokerIds) throws Exception {
+        Map<String, Integer> brokerLoad = new HashMap<>();
+
+        for (String brokerId : brokerIds) {
+            List<Integer> partitions = zkClient.getAssignedPartitions(brokerId);
+            brokerLoad.put(brokerId, partitions.size());
         }
 
-        // Reassign partitions using round-robin
-        int brokerIndex = 0;
-        for (Map.Entry<Integer, String> entry : currentAssignments.entrySet()) {
-            int partitionId = entry.getKey();
-            String assignedBroker = entry.getValue();
-
-            if (assignedBroker == null || !brokerIds.contains(assignedBroker)) {
-                // Assign partition to the next available broker
-                String newBroker = brokerIds.get(brokerIndex % brokerIds.size());
-                zkClient.assignPartitionToBroker(topic, partitionId, newBroker);
-                System.out.println("Partition " + partitionId + " reassigned to broker " + newBroker);
-                brokerIndex++;
-            } else {
-                System.out.println("Partition " + partitionId + " remains with broker " + assignedBroker);
-            }
-        }
+        return brokerLoad;
     }
 
     /**
