@@ -1,5 +1,6 @@
 #include "consumer_group.h"
 #include <iostream>
+#include <algorithm>
 
 ConsumerGroup::ConsumerGroup(std::string tag, std::string group_id) : tag(tag), group_id(group_id) {}
 
@@ -13,35 +14,46 @@ bool ConsumerGroup::IsTopicConsumed(std::string topic, int partition) {
     return false;
 }
 
-bool ConsumerGroup::AddConsumer(const std::vector<std::string>& bootstrap_servers, std::string consumer_id, std::vector<std::string> topics, std::vector<int> partitions, std::vector<int> offsets) {
+bool ConsumerGroup::AddConsumer(const std::vector<std::string>& bootstrap_servers, 
+                                 std::string consumer_id, 
+                                 std::vector<std::string> topics, 
+                                 std::vector<int> partitions, 
+                                 std::vector<int> offsets) {
     // Check if the consumer is already present in the group
-    for(const auto& consumer : consumers_) {
-        if(consumer->get_consumer_id() == consumer_id) {
+    for (const auto& consumer : consumers_) {
+        if (consumer->get_consumer_id() == consumer_id) {
             std::cerr << "Consumer " << consumer_id << " is already present in the group" << std::endl;
             return false;
         }
     }
-    // Check if the topics are already being consumed by another consumer
-    for(const auto& topic : topics) {
-        for(int i = 0; i < partitions.size(); i++) {
-            if(IsTopicConsumed(topic, partitions[i])) {
-                std::cerr << "Topic " << topic << " partition " << partitions[i] << " is already being consumed by another consumer" << std::endl;
-                return false;
-            }
+
+    // Check if the topics and partitions are already being consumed within this group
+    for (size_t i = 0; i < topics.size(); ++i) {
+        std::string topic = topics[i];
+        int partition = partitions[i];
+        if (IsTopicConsumed(topic, partition)) {
+            std::cerr << "Topic " << topic << " partition " << partition 
+                      << " is already being consumed within this group" << std::endl;
+            return false;
         }
     }
 
+    // Add the new consumer
     consumers_.push_back(std::make_unique<Consumer>(bootstrap_servers, consumer_id));
 
-    for(int i = 0; i < topics.size(); i++) {
-        for(int j = 0; j < partitions.size(); j++) {
-            topic_state state;
-            state.topic = topics[i];
-            state.partition = partitions[j];
-            state.offset = offsets[j];
-            consumer_topic_state_[consumer_id][topics[i]].push_back(state);
-            topic_partition_consumer_.insert({topics[i] + "-" + std::to_string(partitions[j]), consumer_id});
-        }
+    // Assign topics, partitions, and offsets to the consumer
+    for (size_t i = 0; i < topics.size(); ++i) {
+        std::string topic = topics[i];
+        int partition = partitions[i];
+        int offset = offsets[i];
+
+        // Add topic state
+        topic_state state = {topic, partition, offset};
+        consumer_topic_state_[consumer_id][topic].push_back(state);
+
+        // Update the topic-partition-to-consumer map for this group
+        std::string key = topic + "-" + std::to_string(partition);
+        topic_partition_consumer_[key] = consumer_id;
     }
 
     return true;
