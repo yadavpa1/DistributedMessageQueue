@@ -10,7 +10,6 @@ public class MessageQueueCluster {
         int numberOfServers = 3; // Number of servers to start
         int startingPort = 8080; // Starting port for servers
         String zkServers = "localhost:2181";
-        String bkServers = "";
         List<Process> processes = new ArrayList<>();
 
         try {
@@ -26,7 +25,6 @@ public class MessageQueueCluster {
                 command.add(System.getProperty("java.class.path")); // Include the current classpath
                 command.add("com.clustercrew.messagequeue.MessageQueueServer");
                 command.add(zkServers);
-                command.add(bkServers);
                 command.add(brokerId);
                 command.add(brokerAddress);
 

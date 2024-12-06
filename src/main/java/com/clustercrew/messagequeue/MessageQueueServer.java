@@ -19,7 +19,7 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
     private final String brokerId;
     private final String brokerAddress;
 
-    public MessageQueueServer(String zkServers, String bkServers, String brokerId, String brokerAddress) {
+    public MessageQueueServer(String zkServers, String brokerId, String brokerAddress) {
         this.brokerId = brokerId;
         this.brokerAddress = brokerAddress;
         this.topicPartitions = new HashMap<>();
@@ -243,12 +243,11 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
         }
     
         String zkServers = args[0];
-        String bkServers = args[1];
-        String brokerId = args[2];
-        String brokerAddress = args[3];
+        String brokerId = args[1];
+        String brokerAddress = args[2];
     
         Server server = ServerBuilder.forPort(Integer.parseInt(brokerAddress.split(":")[1]))
-                .addService(new MessageQueueServer(zkServers, bkServers, brokerId, brokerAddress))
+                .addService(new MessageQueueServer(zkServers, brokerId, brokerAddress))
                 .build()
                 .start();
     
