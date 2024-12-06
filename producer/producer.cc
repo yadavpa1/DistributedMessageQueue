@@ -20,19 +20,14 @@ public:
         : router_(std::make_unique<Router>(bootstrap_servers)),
           flush_threshold_(flush_threshold),
           flush_interval_ms_(flush_interval_ms),
-          producer_id(producer_id),
-          current_buffer_size_(0),
-          run_timer_(true){
-            // Start a timer to flush messages periodically
-            timer_thread_ = std::thread(&Impl::FlushMessagesPeriodically, this);
-          }
+          producer_id(producer_id) {}
     
     ~Impl() {
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            run_timer_ = false;
-            if(timer_thread_.joinable()) {
-                timer_thread_.join();
+            run_timers_ = false;
+            for(auto &timer: topic_partition_timers_) {
+                timer.second.join();
             }
         }
     }
@@ -41,12 +36,6 @@ public:
         try {
             // Compute the target partition using key. total_partition is fixed to be 3.
             int partition = std::hash<std::string>{}(key) % total_partitions;
-
-            // Get broker_ip for partition
-            std::string broker_ip = router_->GetBrokerIP(topic, partition);
-
-            std::cout << "Routing message to broker at: " << broker_ip << " for topic: " << topic
-                      << ", partition: " << partition << std::endl;
 
             // Prepare the message
             message_queue::Message message;
@@ -58,11 +47,15 @@ public:
             
             {
                 std::lock_guard<std::mutex> lock(mutex_);
-                message_map_[broker_ip].push_back(message);
-                current_buffer_size_ += 1;
-                if (current_buffer_size_ >= flush_threshold_) {
-                    FlushAllMessages();
-                    current_buffer_size_ = 0;
+                std::string topic_partition = topic + "-" + std::to_string(partition);
+                message_map_[topic_partition].push_back(message);
+                if (message_map_[topic_partition].size() >= flush_threshold_) {
+                    FlushMessages(topic_partition);
+                    message_map_[topic_partition].clear();
+                }
+
+                if(topic_partition_timers_.find(topic_partition) == topic_partition_timers_.end() && message_map_[topic_partition].size() > 0) {
+                    topic_partition_timers_[topic_partition] = std::thread(&Impl::FlushMessagesPeriodically, this, topic_partition);
                 }
             }
             return true;
@@ -74,8 +67,8 @@ public:
     }
 
 private:
-    void FlushMessages(const std::string &broker_ip) {
-        auto it = message_map_.find(broker_ip);
+    void FlushMessages(const std::string &topic_partition) {
+        auto it = message_map_.find(topic_partition);
         if(it != message_map_.end()) {
             std::vector<message_queue::Message> messages = it->second;
 
@@ -83,6 +76,9 @@ private:
                 return;
             }
             
+            std::string topic = topic_partition.substr(0, topic_partition.find("-"));
+            int partition = std::stoi(topic_partition.substr(topic_partition.find("-") + 1));
+            std::string broker_ip = router_->GetBrokerIP(topic, partition);
             auto channel = grpc::CreateChannel(broker_ip, grpc::InsecureChannelCredentials());
             auto stub = message_queue::MessageQueue::NewStub(channel);
 
@@ -100,42 +96,30 @@ private:
             } else {
                 std::cerr << "Failed to produce messages to broker at: " << broker_ip << std::endl;
             }
-            message_map_[broker_ip].clear();
         }
     }
 
-    void FlushAllMessages() {
-        std::vector<std::future<void>> futures;
-        for(const auto &kv: message_map_) {
-            futures.push_back(std::async(std::launch::async, &Impl::FlushMessages, this, kv.first));
-        }
-        for(auto &f: futures) {
-            f.wait();
-        }
-    }
-
-    void FlushMessagesPeriodically() {
-        while(run_timer_) {
+    void FlushMessagesPeriodically(const std::string &topic_partition) {
+        while(run_timers_) {
             std::this_thread::sleep_for(std::chrono::milliseconds(flush_interval_ms_));
             {
                 std::lock_guard<std::mutex> lock(mutex_);
-                FlushAllMessages();
-                current_buffer_size_ = 0;
+                if(!message_map_[topic_partition].empty()) {
+                    FlushMessages(topic_partition);
+                    message_map_[topic_partition].clear();
+                }
             }
         }
     }
 
     std::unique_ptr<Router> router_;
     std::unordered_map<std::string, std::vector<message_queue::Message>> message_map_;
-
-    std::atomic<int> current_buffer_size_;
+    std::unordered_map<std::string, std::thread> topic_partition_timers_;
     std::mutex mutex_;
+    bool run_timers_ = true;
     int flush_threshold_;
     int flush_interval_ms_;
     std::string producer_id;
-
-    std::thread timer_thread_;
-    std::atomic<bool> run_timer_;
 };
 
 // Producer constructor
