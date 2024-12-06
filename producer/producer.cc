@@ -20,14 +20,19 @@ public:
         : router_(std::make_unique<Router>(bootstrap_servers)),
           flush_threshold_(flush_threshold),
           flush_interval_ms_(flush_interval_ms),
-          producer_id(producer_id) {}
+          producer_id(producer_id),
+          current_buffer_size_(0),
+          run_timer_(true){
+            // Start a timer to flush messages periodically
+            timer_thread_ = std::thread(&Impl::FlushMessagesPeriodically, this);
+          }
     
     ~Impl() {
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            run_timers_ = false;
-            for(auto &timer: broker_timers_) {
-                timer.second.join();
+            run_timer_ = false;
+            if(timer_thread_.joinable()) {
+                timer_thread_.join();
             }
         }
     }
@@ -54,13 +59,10 @@ public:
             {
                 std::lock_guard<std::mutex> lock(mutex_);
                 message_map_[broker_ip].push_back(message);
-                if (message_map_[broker_ip].size() >= flush_threshold_) {
-                    FlushMessages(broker_ip);
-                    message_map_[broker_ip].clear();
-                }
-
-                if(broker_timers_.find(broker_ip) == broker_timers_.end() && message_map_[broker_ip].size() > 0) {
-                    broker_timers_[broker_ip] = std::thread(&Impl::FlushMessagesPeriodically, this, broker_ip);
+                current_buffer_size_ += 1;
+                if (current_buffer_size_ >= flush_threshold_) {
+                    FlushAllMessages();
+                    current_buffer_size_ = 0;
                 }
             }
             return true;
@@ -98,30 +100,42 @@ private:
             } else {
                 std::cerr << "Failed to produce messages to broker at: " << broker_ip << std::endl;
             }
+            message_map_[broker_ip].clear();
         }
     }
 
-    void FlushMessagesPeriodically(const std::string &broker_ip) {
-        while(run_timers_) {
+    void FlushAllMessages() {
+        std::vector<std::future<void>> futures;
+        for(const auto &kv: message_map_) {
+            futures.push_back(std::async(std::launch::async, &Impl::FlushMessages, this, kv.first));
+        }
+        for(auto &f: futures) {
+            f.wait();
+        }
+    }
+
+    void FlushMessagesPeriodically() {
+        while(run_timer_) {
             std::this_thread::sleep_for(std::chrono::milliseconds(flush_interval_ms_));
             {
                 std::lock_guard<std::mutex> lock(mutex_);
-                if(!message_map_[broker_ip].empty()) {
-                    FlushMessages(broker_ip);
-                    message_map_[broker_ip].clear();
-                }
+                FlushAllMessages();
+                current_buffer_size_ = 0;
             }
         }
     }
 
     std::unique_ptr<Router> router_;
     std::unordered_map<std::string, std::vector<message_queue::Message>> message_map_;
-    std::unordered_map<std::string, std::thread> broker_timers_;
+
+    std::atomic<int> current_buffer_size_;
     std::mutex mutex_;
-    bool run_timers_ = true;
     int flush_threshold_;
     int flush_interval_ms_;
     std::string producer_id;
+
+    std::thread timer_thread_;
+    std::atomic<bool> run_timer_;
 };
 
 // Producer constructor
