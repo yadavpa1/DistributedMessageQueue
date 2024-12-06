@@ -258,14 +258,20 @@ public class ZooKeeperClient {
      * @throws Exception If an error occurs while fetching the partitions.
      */
     public List<Integer> getAssignedPartitions(String brokerId) throws Exception {
-        String brokerPath = "/brokers/" + brokerId + "/partitions";
+        String brokerPath = "/brokers/" + brokerId + "/topics";
         ensurePathExists(brokerPath);
 
         List<Integer> assignedPartitions = new ArrayList<>();
-        List<String> partitionNodes = zk.getChildren(brokerPath, false);
+        List<String> topics = zk.getChildren(brokerPath, false);
+        for (String topic : topics) {
+            String partitionsPath = brokerPath + "/" + topic + "/partitions";
+            ensurePathExists(partitionsPath);
 
-        for (String partitionNode : partitionNodes) {
-            assignedPartitions.add(Integer.parseInt(partitionNode));
+            // Fetch partitions for the current topic
+            List<String> partitions = zk.getChildren(partitionsPath, false);
+            for (String partition : partitions) {
+                assignedPartitions.add(Integer.parseInt(partition));
+            }
         }
 
         return assignedPartitions;
