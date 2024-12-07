@@ -38,6 +38,7 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/common")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/producer")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/consumer")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/sys_admin")
+include_directories("${CMAKE_CURRENT_BINARY_DIR}/test") 
 
 # dmq_grpc_proto library
 add_library(dmq_grpc_proto
@@ -149,5 +150,15 @@ target_link_libraries(sys_admin_client
     sys_admin
 )
 
+# Test executable
+add_executable( performace
+    test/performace.cc
+)
+target_link_libraries (performace
+    producer
+    consumer_group
+    -static-libstdc++ -static-libgcc
+
+)
 # Set compiler flags for position-independent code for building shared libraries
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
