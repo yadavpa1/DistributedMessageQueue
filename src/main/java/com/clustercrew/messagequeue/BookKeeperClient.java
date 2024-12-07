@@ -35,7 +35,8 @@ public class BookKeeperClient {
     }
 
     /**
-     * Creates a new ledger for a topic partition and updates the mapping in ZooKeeper.
+     * Creates a new ledger for a topic partition and updates the mapping in
+     * ZooKeeper.
      *
      * @param topic     The topic name.
      * @param partition The partition number.
@@ -88,7 +89,8 @@ public class BookKeeperClient {
 
     /**
      * Writes a message to the current active ledger of the topic partition.
-     * If the ledger reaches its max entries, it is closed, and a new ledger is created.
+     * If the ledger reaches its max entries, it is closed, and a new ledger is
+     * created.
      *
      * @param topic     The topic name.
      * @param partition The partition number.
@@ -141,7 +143,8 @@ public class BookKeeperClient {
     }
 
     /**
-     * Reads messages from a topic partition ledger starting from the specified logical offset.
+     * Reads messages from a topic partition ledger starting from the specified
+     * logical offset.
      *
      * @param topic       The topic name.
      * @param partition   The partition number.
@@ -158,14 +161,15 @@ public class BookKeeperClient {
 
         for (int i = 0; i < ledgerIds.size(); i++) {
             long ledgerId = ledgerIds.get(i);
-            boolean isActiveLedger = (i == ledgerIds.size() - 1); // The last ledger is the active one
+            boolean isActiveLedger = (i == ledgerIds.size() - 1)
+                    && !activeLedgers.get(topic).get(partition).isClosed(); // The last ledger is the active one
 
-            try (LedgerHandle ledger = isActiveLedger 
-                    ? getOrCreateActiveLedger(topic, partition) 
+            try (LedgerHandle ledger = isActiveLedger
+                    ? getOrCreateActiveLedger(topic, partition)
                     : bookKeeper.openLedger(
-                      ledgerId,
-                      BookKeeper.DigestType.CRC32,
-                      "password".getBytes(StandardCharsets.UTF_8))) {
+                            ledgerId,
+                            BookKeeper.DigestType.CRC32,
+                            "password".getBytes(StandardCharsets.UTF_8))) {
 
                 long ledgerStart = currentOffset;
                 long ledgerEnd = currentOffset + ledger.getLastAddConfirmed() + 1;
@@ -190,7 +194,7 @@ public class BookKeeperClient {
                 if (messages.size() >= maxMessages) {
                     break;
                 }
-            
+
             } catch (BKLedgerClosedException e) {
                 System.out.println("Ledger closed unexpectedly while reading: " + ledgerId);
                 throw new Exception("Error reading ledger " + ledgerId, e);
