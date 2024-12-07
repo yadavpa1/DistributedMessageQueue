@@ -26,7 +26,7 @@ public:
         {
             std::lock_guard<std::mutex> lock(mutex_);
             run_timers_ = false;
-            for(auto &timer: broker_timers_) {
+            for(auto &timer: topic_partition_timers_) {
                 timer.second.join();
             }
         }
@@ -36,12 +36,6 @@ public:
         try {
             // Compute the target partition using key. total_partition is fixed to be 3.
             int partition = std::hash<std::string>{}(key) % total_partitions;
-
-            // Get broker_ip for partition
-            std::string broker_ip = router_->GetBrokerIP(topic, partition);
-
-            std::cout << "Routing message to broker at: " << broker_ip << " for topic: " << topic
-                      << ", partition: " << partition << std::endl;
 
             // Prepare the message
             message_queue::Message message;
@@ -53,14 +47,15 @@ public:
             
             {
                 std::lock_guard<std::mutex> lock(mutex_);
-                message_map_[broker_ip].push_back(message);
-                if (message_map_[broker_ip].size() >= flush_threshold_) {
-                    FlushMessages(broker_ip);
-                    message_map_[broker_ip].clear();
+                std::string topic_partition = topic + "-" + std::to_string(partition);
+                message_map_[topic_partition].push_back(message);
+                if (message_map_[topic_partition].size() >= flush_threshold_) {
+                    FlushMessages(topic_partition);
+                    message_map_[topic_partition].clear();
                 }
 
-                if(broker_timers_.find(broker_ip) == broker_timers_.end() && message_map_[broker_ip].size() > 0) {
-                    broker_timers_[broker_ip] = std::thread(&Impl::FlushMessagesPeriodically, this, broker_ip);
+                if(topic_partition_timers_.find(topic_partition) == topic_partition_timers_.end() && message_map_[topic_partition].size() > 0) {
+                    topic_partition_timers_[topic_partition] = std::thread(&Impl::FlushMessagesPeriodically, this, topic_partition);
                 }
             }
             return true;
@@ -72,8 +67,8 @@ public:
     }
 
 private:
-    void FlushMessages(const std::string &broker_ip) {
-        auto it = message_map_.find(broker_ip);
+    void FlushMessages(const std::string &topic_partition) {
+        auto it = message_map_.find(topic_partition);
         if(it != message_map_.end()) {
             std::vector<message_queue::Message> messages = it->second;
 
@@ -81,6 +76,9 @@ private:
                 return;
             }
             
+            std::string topic = topic_partition.substr(0, topic_partition.find("-"));
+            int partition = std::stoi(topic_partition.substr(topic_partition.find("-") + 1));
+            std::string broker_ip = router_->GetBrokerIP(topic, partition);
             auto channel = grpc::CreateChannel(broker_ip, grpc::InsecureChannelCredentials());
             auto stub = message_queue::MessageQueue::NewStub(channel);
 
@@ -101,14 +99,14 @@ private:
         }
     }
 
-    void FlushMessagesPeriodically(const std::string &broker_ip) {
+    void FlushMessagesPeriodically(const std::string &topic_partition) {
         while(run_timers_) {
             std::this_thread::sleep_for(std::chrono::milliseconds(flush_interval_ms_));
             {
                 std::lock_guard<std::mutex> lock(mutex_);
-                if(!message_map_[broker_ip].empty()) {
-                    FlushMessages(broker_ip);
-                    message_map_[broker_ip].clear();
+                if(!message_map_[topic_partition].empty()) {
+                    FlushMessages(topic_partition);
+                    message_map_[topic_partition].clear();
                 }
             }
         }
@@ -116,7 +114,7 @@ private:
 
     std::unique_ptr<Router> router_;
     std::unordered_map<std::string, std::vector<message_queue::Message>> message_map_;
-    std::unordered_map<std::string, std::thread> broker_timers_;
+    std::unordered_map<std::string, std::thread> topic_partition_timers_;
     std::mutex mutex_;
     bool run_timers_ = true;
     int flush_threshold_;

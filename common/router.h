@@ -12,8 +12,11 @@ class Router {
 public:
     Router(const std::vector<std::string>& bootstrap_servers);
 
-    // Gets the leader for a given topic and partition
+    // Gets the broker for a given topic and partition
     std::string GetBrokerIP(const std::string& topic, int partition);
+
+    // Gets the broker for a given broker id
+    std::string GetBrokerIP(const std::string& broker_id);
     
      // Fetch routing table for a given topic periodically
     void StartPeriodicMetadataRefresh(int interval_ms); // Optional Feature. Call when router is initialized.
