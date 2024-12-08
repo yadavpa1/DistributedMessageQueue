@@ -214,64 +214,6 @@ public class MessageQueueServer extends MessageQueueGrpc.MessageQueueImplBase {
         }
     }
 
-    @Override
-    public void getBrokerAddress(BrokerAddressRequest request, StreamObserver<BrokerAddressResponse> responseObserver) {
-        try {
-            String brokerId = request.getBrokerId();
-            String brokerAddress = zkClient.getBrokerAddress(brokerId);
-
-            BrokerAddressResponse response = BrokerAddressResponse.newBuilder()
-                    .setSuccess(true)
-                    .setBrokerAddress(brokerAddress)
-                    .build();
-            responseObserver.onNext(response);
-        } catch (Exception e) {
-            BrokerAddressResponse response = BrokerAddressResponse.newBuilder()
-                    .setSuccess(false)
-                    .setErrorMessage(e.getMessage())
-                    .build();
-            responseObserver.onNext(response);
-        } finally {
-            responseObserver.onCompleted();
-        }
-    }
-
-    @Override
-    public void shutdown(ShutdownRequest request, StreamObserver<ShutdownResponse> responseObserver) {
-        try {
-            // Check if broker id is same as the one in the request
-            if (!brokerId.equals(request.getBrokerId())) {
-                // Use zookeeper to get the broker address for the broker id
-                String brokerAddress = zkClient.getBrokerAddress(request.getBrokerId());
-                // Return error with the broker address
-                ShutdownResponse response = ShutdownResponse.newBuilder()
-                        .setSuccess(false)
-                        .setErrorMessage("Broker ID does not match")
-                        .setBrokerAddress(brokerAddress)
-                        .build();
-                responseObserver.onNext(response);
-                responseObserver.onCompleted();
-                return;
-            } else {
-                // Stop the server
-                stopServer();
-                // Return success
-                ShutdownResponse response = ShutdownResponse.newBuilder()
-                        .setSuccess(true)
-                        .build();
-                responseObserver.onNext(response);
-                responseObserver.onCompleted();
-            }
-        } catch (Exception e) {
-            ShutdownResponse response = ShutdownResponse.newBuilder()
-                    .setSuccess(false)
-                    .setErrorMessage(e.getMessage())
-                    .build();
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
-        }
-    }
-
     private Partition getOrCreatePartition(String topic, int partition) throws Exception {
         synchronized (topicPartitions) {
             topicPartitions.computeIfAbsent(topic, k -> new HashMap<>());

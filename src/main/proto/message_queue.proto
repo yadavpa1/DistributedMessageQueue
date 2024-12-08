@@ -8,8 +8,6 @@ service MessageQueue {
     rpc ProduceMessages(ProduceMessagesRequest) returns (ProduceMessagesResponse);
     rpc ConsumeMessages(ConsumeMessagesRequest) returns (ConsumeMessagesResponse);    
     rpc GetMetadata(MetadataRequest) returns (MetadataResponse);
-    rpc GetBrokerAddress(BrokerAddressRequest) returns (BrokerAddressResponse);
-    rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);   
 }
 
 message Message {
@@ -59,24 +57,4 @@ message MetadataResponse {
 message PartitionMetadata {
     int32 partition_id = 1;
     string broker_address = 2;
-}
-
-message BrokerAddressRequest {
-    string broker_id = 1;
-}
-
-message BrokerAddressResponse {
-    string broker_address = 1;
-    bool success = 2;
-    string error_message = 3;
-}
-
-message ShutdownRequest {
-    string broker_id = 1;
-}
-
-message ShutdownResponse {
-    bool success = 1;
-    string error_message = 2;
-    string broker_address = 3;
 }
