@@ -7,10 +7,6 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/common.cmake")
 # Find absl package
 find_package(absl CONFIG REQUIRED)
 
-# Find RocksDB
-# find_package(RocksDB CONFIG REQUIRED)
-# message(STATUS "RocksDB found at: ${ROCKSDB_LIB}")
-
 # Proto file
 get_filename_component(dmq_proto "./src/main/proto/message_queue.proto" ABSOLUTE)
 get_filename_component(dmq_proto_path "${dmq_proto}" PATH)
@@ -38,9 +34,10 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/common")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/producer")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/consumer")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/sys_admin")
+include_directories("${CMAKE_CURRENT_BINARY_DIR}/tests")
 
 # dmq_grpc_proto library
-add_library(dmq_grpc_proto
+add_library(dmq_grpc_proto STATIC
     "${dmq_proto_srcs}"
     "${dmq_grpc_srcs}"
     "${dmq_proto_hdrs}"
@@ -53,28 +50,8 @@ target_link_libraries(dmq_grpc_proto
     ${_PROTOBUF_LIBPROTOBUF}
     -static-libstdc++ -static-libgcc)
 
-# RocksDB wrapper library
-# add_library(rocksdb_wrapper
-#   message_queue_server/rocksdb_wrapper.cc)
-# target_link_libraries(rocksdb_wrapper
-#   RocksDB::rocksdb 
-#   -static-libstdc++ -static-libgcc)
-
-# Message queue server
-# add_executable(message_queue_server
-#   message_queue_server/main.cc
-#   message_queue_server/message_queue_service.cc)
-# target_link_libraries(message_queue_server
-#   rocksdb_wrapper
-#   dmq_grpc_proto
-#   absl::flags_parse
-#   absl::log_initialize
-#   absl::log_globals
-#   ${CMAKE_THREAD_LIBS_INIT}
-#   -static-libstdc++ -static-libgcc)
-
 # Consumer library
-add_library(consumer 
+add_library(consumer STATIC
     consumer/consumer.cc
     common/router.cc
 )
@@ -87,7 +64,7 @@ target_link_libraries(consumer
 )
 
 # Consumer group library
-add_library(consumer_group SHARED 
+add_library(consumer_group STATIC 
     consumer/consumer_group.cc
 )
 
@@ -108,7 +85,7 @@ target_link_libraries(consumer_client
 )
 
 # Producer library
-add_library(producer SHARED 
+add_library(producer STATIC 
     producer/producer.cc
     common/router.cc
 )
@@ -128,7 +105,7 @@ target_link_libraries(producer_client
 )
 
 # System admin library
-add_library(sys_admin SHARED 
+add_library(sys_admin STATIC 
     sys_admin/sys_admin.cc
     common/router.cc
 )
@@ -151,3 +128,23 @@ target_link_libraries(sys_admin_client
 
 # Set compiler flags for position-independent code for building shared libraries
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+
+# Add include directories
+target_include_directories(consumer_group PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/consumer")
+target_include_directories(producer PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/producer")
+
+set(TEST_EXECUTABLES
+    performance_v2
+)
+
+foreach(test_exec ${TEST_EXECUTABLES})
+    add_executable(${test_exec} tests/${test_exec}.cc)
+    target_include_directories(${test_exec} PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/producer"
+        "${CMAKE_CURRENT_SOURCE_DIR}/consumer"
+    )
+    target_link_libraries(${test_exec}
+        consumer_group
+        producer
+    )
+endforeach()

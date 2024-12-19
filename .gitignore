@@ -6,3 +6,4 @@ bin
 zookeeper_data
 bookkeeper*
 docker-compose.yml
+bk-txn

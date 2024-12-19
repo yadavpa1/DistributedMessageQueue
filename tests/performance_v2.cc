@@ -48,9 +48,10 @@ NORMAL READS
 
 int TOTAL_CYCLES = 10000;
 std::vector<std::string> BOOTSTRAP_SERVERS = {"localhost:8080", "localhost:8081", "localhost:8082"};
-int FLUSH_THRESHOLD = 1;
-int FLUSH_INTERVAL_MS = 10000;
+int FLUSH_THRESHOLD = 64;
+int FLUSH_INTERVAL_MS = 10000000;
 int MAX_MESSAGES = 1;
+int NO_OF_TOPICS = 100;
 
 string GenerateRandomString(size_t length) {
     static const string charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
@@ -69,7 +70,7 @@ std::vector<std::vector<std::string>> createTopics(int num_consumer_groups){
 
     for(int i = 0;i<num_consumer_groups;++i){
         std::vector<std::string> topics;
-        for(int j = 0;j<3;++j){
+        for(int j = 0;j<NO_OF_TOPICS;++j){
             std::string topic = GenerateRandomString(3);
             topics.push_back(topic);
         }
@@ -83,7 +84,7 @@ void processOperationsWrite(Producer& producer, bool throughput_mode, std::vecto
     std::chrono::high_resolution_clock::time_point start_time = std::chrono::high_resolution_clock::now();
     for(int i = 0;i<TOTAL_CYCLES;++i){
         // Select random topic
-        std::cout << "Producing message " << i << std::endl;
+        // std::cout << "Producing message " << i << std::endl;
         std::random_device rd;
         std::mt19937 gen(rd());
         std::uniform_int_distribution<> dis(0, topics.size()-1);
@@ -151,7 +152,7 @@ void runBenchmarkWrite(int num_producers, bool throughput_mode){
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> dis(5, 30);
-    std::vector<std::vector<std::string>> overall_topics = createTopics(dis(gen));
+    std::vector<std::vector<std::string>> overall_topics = createTopics(NO_OF_TOPICS);  //dis(gen));
 
     // Fork child processes
     for (int i = 1; i <= num_producers; ++i) {
@@ -356,7 +357,7 @@ int main(int argc, char* argv[]){
         int num_processes = std::stoi(cl_options["processes"]);
 
         // TEST CASE 1.1: Throughput for producer (exclusive topic-partitions)
-        // runBenchmarkWrite(num_processes, true);
+        runBenchmarkWrite(num_processes, true);
 
         // TEST CASE 1.2: Latency for producer (exclusive topic-partitions)
         // runBenchmarkWrite(num_processes, false);
