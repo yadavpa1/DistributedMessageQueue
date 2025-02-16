@@ -11,9 +11,7 @@ The architecture consists of multiple components working together:
 - **Apache ZooKeeper**: Manages metadata and leader election.
 - **Apache BookKeeper**: Provides persistent and replicated message storage.
 
-```markdown
 ![Distributed Message Queue Architecture](assets/Architecture_DMQ_Server.png.png)
-```
 
 ## Features
 - **Scalability**: Efficiently scales across multiple brokers and partitions.
@@ -31,7 +29,7 @@ The architecture consists of multiple components working together:
 - CMake
 - Apache ZooKeeper
 - Apache BookKeeper
-- Python (for automation scripts)
+- gRPC
 
 ### Installation
 1. **Clone the Repository**
@@ -64,7 +62,6 @@ The architecture consists of multiple components working together:
    ```
 
 ## Usage
-
 - **Producing Messages**: Producers send messages to specific queues.
 - **Consuming Messages**: Consumers subscribe to queues and process messages.
 - **System Administration**: Monitor and manage brokers dynamically.
@@ -74,13 +71,8 @@ The architecture consists of multiple components working together:
 - **Fault Tolerance**: Seamless recovery during broker failures.
 - **Consistency**: Ensures at-least-once guarantee.
 
-## Contributing
-Contributions are welcome! Fork the repository and submit a pull request with your changes.
-
 ## License
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 Special thanks to the open-source community for providing tools and frameworks that made this project possible.
-
----
