@@ -14,12 +14,11 @@ The architecture consists of multiple components working together:
 ![Distributed Message Queue Architecture](assets/Architecture_DMQ_Server.png)
 
 ## Features
-- **Scalability**: Efficiently scales across multiple brokers and partitions.
-- **Fault Tolerance**: Ensures reliability even during broker failures.
-- **Message Persistence**: Uses Apache BookKeeper to store messages durably.
-- **Load Balancing**: Evenly distributes messages across consumers.
-- **Delivery Semantics**: Supports at-least-once guarantee.
-- **High Throughput & Low Latency**: Optimized for real-time messaging applications.
+- **Durability**: Reliable, persistent message storage with data replication for guaranteed delivery.
+- **Scalability**: Dynamic addition/removal of brokers and partitioning of topics to handle changing workloads.
+- **Fault Tolerance**: Automatic failover with dynamic partition reassignment for uninterrupted message processing.
+- **Performance**: High throughput and low latency for efficient message processing.
+- **Data Delivery Semantics**: At-least-once delivery for reliable communication.
 
 ## Getting Started
 
@@ -65,11 +64,6 @@ The architecture consists of multiple components working together:
 - **Producing Messages**: Producers send messages to specific queues.
 - **Consuming Messages**: Consumers subscribe to queues and process messages.
 - **System Administration**: Monitor and manage brokers dynamically.
-
-## Performance Evaluation
-- **Throughput & Latency**: Scales with increasing producers and consumers.
-- **Fault Tolerance**: Seamless recovery during broker failures.
-- **Consistency**: Ensures at-least-once guarantee.
 
 ## License
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
