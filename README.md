@@ -1,7 +1,7 @@
 # Distributed Message Queue
 
 ## Overview
-This projects implements a scalable and fault-tolerant messaging system designed to facilitate reliable communication between producers and consumers in distributed environments. The system implements message persistence, load balancing, and dynamic scaling, making it ideal for asynchronous messaging.
+This project implements a scalable and fault-tolerant messaging system designed to facilitate reliable communication between producers and consumers in distributed environments. The system implements message persistence, load balancing, and dynamic scaling, making it ideal for asynchronous messaging.
 
 ## Architecture
 The architecture consists of multiple components working together:
