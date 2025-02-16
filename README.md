@@ -11,7 +11,7 @@ The architecture consists of multiple components working together:
 - **Apache ZooKeeper**: Manages metadata and leader election.
 - **Apache BookKeeper**: Provides persistent and replicated message storage.
 
-![Distributed Message Queue Architecture](assets/Architecture_DMQ_Server.png.png)
+![Distributed Message Queue Architecture](assets/Architecture_DMQ_Server.png)
 
 ## Features
 - **Scalability**: Efficiently scales across multiple brokers and partitions.
